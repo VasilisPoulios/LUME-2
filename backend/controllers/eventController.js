@@ -125,12 +125,44 @@ exports.searchEvents = asyncHandler(async (req, res) => {
     throw new Error('Please provide a search query');
   }
 
-  const events = await Event.find(
-    { $text: { $search: req.query.q } },
-    { score: { $meta: 'textScore' } }
-  )
-    .sort({ score: { $meta: 'textScore' } })
-    .populate('organizer', 'name email avatar');
+  const searchTerm = req.query.q;
+  let events = [];
+
+  try {
+    // First attempt: Try the text index search for exact matches
+    events = await Event.find(
+      { $text: { $search: searchTerm } },
+      { score: { $meta: 'textScore' } }
+    )
+      .sort({ score: { $meta: 'textScore' } })
+      .populate('organizer', 'name email avatar');
+    
+    // If text search didn't yield results, try regex for partial matches
+    if (events.length === 0) {
+      const regexSearch = new RegExp(searchTerm, 'i'); // case-insensitive
+      events = await Event.find({
+        $or: [
+          { title: regexSearch },
+          { description: regexSearch },
+          { venue: regexSearch },
+          { address: regexSearch },
+          { tags: regexSearch }
+        ]
+      }).populate('organizer', 'name email avatar');
+    }
+  } catch (error) {
+    // In case of any issues with text search, fall back to regex search
+    const regexSearch = new RegExp(searchTerm, 'i'); // case-insensitive
+    events = await Event.find({
+      $or: [
+        { title: regexSearch },
+        { description: regexSearch },
+        { venue: regexSearch },
+        { address: regexSearch },
+        { tags: regexSearch }
+      ]
+    }).populate('organizer', 'name email avatar');
+  }
 
   res.status(200).json({
     success: true,
