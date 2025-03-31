@@ -7,7 +7,8 @@ const {
   deleteEvent,
   searchEvents,
   getEventsByDate,
-  getNearbyEvents
+  getNearbyEvents,
+  createRSVP
 } = require('../controllers/eventController');
 
 const router = express.Router();
@@ -50,5 +51,8 @@ router
     authorize('organizer', 'admin'),
     deleteEvent
   );
+
+// RSVP route
+router.post('/:eventId/rsvp', protect, createRSVP);
 
 module.exports = router; 

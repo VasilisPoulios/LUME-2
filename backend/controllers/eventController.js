@@ -2,6 +2,7 @@ const Event = require('../models/Event');
 const asyncHandler = require('express-async-handler');
 const fs = require('fs');
 const path = require('path');
+const Ticket = require('../models/Ticket');
 
 // @desc    Create new event
 // @route   POST /api/events
@@ -316,5 +317,56 @@ exports.deleteEvent = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     data: {}
+  });
+});
+
+// @desc    Create RSVP for a free event
+// @route   POST /api/events/:eventId/rsvp
+// @access  Private
+exports.createRSVP = asyncHandler(async (req, res) => {
+  const event = await Event.findById(req.params.eventId);
+
+  if (!event) {
+    res.status(404);
+    throw new Error('Event not found');
+  }
+
+  // Check if event is free
+  if (event.price > 0) {
+    res.status(400);
+    throw new Error('This event requires payment. Please use the purchase ticket endpoint.');
+  }
+
+  // Check if user has already RSVP'd
+  const existingTicket = await Ticket.findOne({
+    user: req.user.id,
+    event: req.params.eventId
+  });
+
+  if (existingTicket) {
+    res.status(400);
+    throw new Error('You have already RSVP\'d for this event');
+  }
+
+  // Check if tickets are available
+  if (event.ticketsAvailable <= 0) {
+    res.status(400);
+    throw new Error('No tickets available for this event');
+  }
+
+  // Create ticket with unique code
+  const ticket = await Ticket.create({
+    user: req.user.id,
+    event: req.params.eventId,
+    status: 'active'
+  });
+
+  // Decrement available tickets
+  event.ticketsAvailable -= 1;
+  await event.save();
+
+  res.status(201).json({
+    success: true,
+    data: ticket
   });
 }); 
