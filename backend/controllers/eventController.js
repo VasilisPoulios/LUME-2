@@ -3,6 +3,8 @@ const asyncHandler = require('express-async-handler');
 const fs = require('fs');
 const path = require('path');
 const Ticket = require('../models/Ticket');
+const Review = require('../models/Review');
+const User = require('../models/User');
 
 // @desc    Create new event
 // @route   POST /api/events
@@ -13,7 +15,13 @@ exports.createEvent = asyncHandler(async (req, res) => {
   
   // Handle image upload
   if (req.file) {
-    req.body.image = `/uploads/events/${req.file.filename}`;
+    // Format the image path for database storage
+    const imagePath = `/uploads/events/${path.basename(req.file.path)}`;
+    req.body.image = imagePath;
+    console.log('Image uploaded:', imagePath);
+  } else {
+    // Set default image if none provided
+    req.body.image = '/uploads/events/default-event.jpg';
   }
 
   // Create event
@@ -29,75 +37,89 @@ exports.createEvent = asyncHandler(async (req, res) => {
 // @route   GET /api/events
 // @access  Public
 exports.getEvents = asyncHandler(async (req, res) => {
-  let query;
+  // Log the request to debug
+  console.log('GET /api/events request received', req.query);
   
-  // Copy req.query
-  const reqQuery = { ...req.query };
-  
-  // Fields to exclude
-  const removeFields = ['select', 'sort', 'page', 'limit'];
-  
-  // Loop over removeFields and delete them from reqQuery
-  removeFields.forEach(param => delete reqQuery[param]);
-  
-  // Create query string
-  let queryStr = JSON.stringify(reqQuery);
-  
-  // Create operators ($gt, $gte, etc)
-  queryStr = queryStr.replace(/\b(gt|gte|lt|lte|in)\b/g, match => `$${match}`);
-  
-  // Finding resource
-  query = Event.find(JSON.parse(queryStr)).populate('organizer', 'name email avatar');
-  
-  // Select fields
-  if (req.query.select) {
-    const fields = req.query.select.split(',').join(' ');
-    query = query.select(fields);
+  try {
+    // Pagination
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    
+    // Sorting
+    const sort = req.query.sort || '-startDateTime';
+    
+    // Build query object
+    const queryObj = {};
+    
+    // Filter by category
+    if (req.query.category) {
+      queryObj.category = req.query.category;
+    }
+    
+    // Filter by date range
+    if (req.query.startDate) {
+      queryObj.startDateTime = { ...queryObj.startDateTime, $gte: new Date(req.query.startDate) };
+    }
+    
+    if (req.query.endDate) {
+      queryObj.endDateTime = { ...queryObj.endDateTime, $lte: new Date(req.query.endDate) };
+    }
+    
+    // Filter by search term across multiple fields
+    if (req.query.search) {
+      const searchRegex = new RegExp(req.query.search, 'i');
+      queryObj.$or = [
+        { title: searchRegex },
+        { description: searchRegex },
+        { venue: searchRegex },
+        { address: searchRegex }
+      ];
+    }
+    
+    // Featured events filter (typically curated by admins)
+    if (req.query.featured !== undefined) {
+      queryObj.isFeatured = req.query.featured === 'true';
+    }
+    
+    // Hot events filter (recent popular events)
+    if (req.query.hot !== undefined) {
+      queryObj.isHot = req.query.hot === 'true';
+    }
+    
+    // Unmissable events filter (special promotions)
+    if (req.query.unmissable !== undefined) {
+      queryObj.isUnmissable = req.query.unmissable === 'true';
+    }
+    
+    console.log('Query object:', queryObj);
+    
+    // Execute query with filters
+    const events = await Event.find(queryObj)
+      .populate('organizer', 'name email avatar')
+      .sort(sort)
+      .skip(skip)
+      .limit(limit);
+    
+    // Get total count for pagination
+    const totalEvents = await Event.countDocuments(queryObj);
+    
+    console.log(`Found ${events.length} events out of ${totalEvents} total`);
+    
+    res.status(200).json({
+      success: true,
+      count: events.length,
+      totalPages: Math.ceil(totalEvents / limit),
+      currentPage: page,
+      data: events
+    });
+  } catch (error) {
+    console.error('Error in getEvents:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error: ' + error.message
+    });
   }
-  
-  // Sort
-  if (req.query.sort) {
-    const sortBy = req.query.sort.split(',').join(' ');
-    query = query.sort(sortBy);
-  } else {
-    query = query.sort('-startDateTime');
-  }
-  
-  // Pagination
-  const page = parseInt(req.query.page, 10) || 1;
-  const limit = parseInt(req.query.limit, 10) || 10;
-  const startIndex = (page - 1) * limit;
-  const endIndex = page * limit;
-  const total = await Event.countDocuments(JSON.parse(queryStr));
-  
-  query = query.skip(startIndex).limit(limit);
-  
-  // Executing query
-  const events = await query;
-  
-  // Pagination result
-  const pagination = {};
-  
-  if (endIndex < total) {
-    pagination.next = {
-      page: page + 1,
-      limit
-    };
-  }
-  
-  if (startIndex > 0) {
-    pagination.prev = {
-      page: page - 1,
-      limit
-    };
-  }
-  
-  res.status(200).json({
-    success: true,
-    count: events.length,
-    pagination,
-    data: events
-  });
 });
 
 // @desc    Get single event
@@ -110,10 +132,25 @@ exports.getEvent = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('Event not found');
   }
+  
+  // Get average rating and total reviews
+  const ratingStats = await Review.getEventRating(req.params.id);
+  
+  // Get 3 most recent reviews
+  const recentReviews = await Review.find({ event: req.params.id })
+    .populate('user', 'name avatar')
+    .populate('organizer', 'name')
+    .sort({ createdAt: -1 })
+    .limit(3);
 
   res.status(200).json({
     success: true,
-    data: event
+    data: {
+      ...event.toObject(),
+      averageRating: ratingStats.averageRating,
+      reviewCount: ratingStats.totalReviews,
+      recentReviews
+    }
   });
 });
 
@@ -264,15 +301,22 @@ exports.updateEvent = asyncHandler(async (req, res) => {
   // Handle image upload
   if (req.file) {
     // Delete old image if it exists and is not the default
-    if (event.image && event.image !== 'default-event.jpg') {
-      const oldImagePath = path.join(__dirname, '..', event.image);
-      if (fs.existsSync(oldImagePath)) {
-        fs.unlinkSync(oldImagePath);
+    if (event.image && !event.image.includes('default-event')) {
+      try {
+        const oldImagePath = path.join(__dirname, '..', event.image);
+        if (fs.existsSync(oldImagePath)) {
+          fs.unlinkSync(oldImagePath);
+          console.log('Deleted old image:', oldImagePath);
+        }
+      } catch (err) {
+        console.error('Error deleting old image:', err);
       }
     }
     
-    // Set new image path
-    req.body.image = `/uploads/events/${req.file.filename}`;
+    // Format the image path for database storage
+    const imagePath = `/uploads/events/${path.basename(req.file.path)}`;
+    req.body.image = imagePath;
+    console.log('New image uploaded:', imagePath);
   }
 
   // Update event
@@ -368,5 +412,120 @@ exports.createRSVP = asyncHandler(async (req, res) => {
   res.status(201).json({
     success: true,
     data: ticket
+  });
+});
+
+// @desc    Get personalized events for user
+// @route   GET /api/events/personalized
+// @access  Private
+exports.getPersonalizedEvents = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user.id);
+  
+  if (!user) {
+    res.status(404);
+    throw new Error('User not found');
+  }
+  
+  // Check if user has interests
+  if (!user.interests || user.interests.length === 0) {
+    res.status(200).json({
+      success: true,
+      message: 'No interests specified. Add interests to get personalized recommendations.',
+      data: []
+    });
+    return;
+  }
+  
+  let query = {
+    $or: [
+      // Match events with tags that match user interests
+      { tags: { $in: user.interests } },
+      // Match events with category that match user interests
+      { category: { $in: user.interests } }
+    ]
+  };
+  
+  // Add location-based filtering if user has location
+  let sortOptions = { startDateTime: 1 }; // Default sort by date
+  
+  if (user.location && user.location.coordinates && user.location.coordinates.length === 2) {
+    // If user has location, add the distance field for sorting
+    const events = await Event.find(query)
+      .populate('organizer', 'name email avatar')
+      .lean(); // Use lean for better performance
+    
+    // Calculate distance for each event
+    events.forEach(event => {
+      if (event.location && event.location.coordinates) {
+        // Calculate distance using the Haversine formula
+        const userLat = user.location.coordinates[1];
+        const userLng = user.location.coordinates[0];
+        const eventLat = event.location.coordinates[1];
+        const eventLng = event.location.coordinates[0];
+        
+        // Haversine formula
+        const R = 6371; // Radius of the Earth in km
+        const dLat = (eventLat - userLat) * Math.PI / 180;
+        const dLon = (eventLng - userLng) * Math.PI / 180;
+        const a = 
+          Math.sin(dLat/2) * Math.sin(dLat/2) +
+          Math.cos(userLat * Math.PI / 180) * Math.cos(eventLat * Math.PI / 180) * 
+          Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const distance = R * c; // Distance in km
+        
+        event.distance = distance;
+      } else {
+        event.distance = Infinity; // Events without location are placed last
+      }
+    });
+    
+    // Sort by distance and then by date
+    events.sort((a, b) => {
+      if (a.distance !== b.distance) {
+        return a.distance - b.distance;
+      }
+      return new Date(a.startDateTime) - new Date(b.startDateTime);
+    });
+    
+    // Limit to 20 events for performance
+    const paginatedEvents = events.slice(0, 20);
+    
+    res.status(200).json({
+      success: true,
+      count: paginatedEvents.length,
+      data: paginatedEvents
+    });
+  } else {
+    // If user doesn't have location, just return matches sorted by date
+    const events = await Event.find(query)
+      .populate('organizer', 'name email avatar')
+      .sort({ startDateTime: 1 })
+      .limit(20);
+      
+    res.status(200).json({
+      success: true,
+      count: events.length,
+      data: events
+    });
+  }
+});
+
+// @desc    Get past events
+// @route   GET /api/events/past
+// @access  Public
+exports.getPastEvents = asyncHandler(async (req, res) => {
+  const currentDate = new Date();
+  
+  const events = await Event.find({
+    endDateTime: { $lt: currentDate }
+  })
+  .populate('organizer', 'name email avatar')
+  .sort({ endDateTime: -1 });
+
+  res.status(200).json({
+    success: true,
+    count: events.length,
+    data: events
   });
 }); 

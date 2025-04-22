@@ -38,9 +38,6 @@ const TicketSchema = new mongoose.Schema(
   }
 );
 
-// Index for quick lookups by ticket code
-TicketSchema.index({ ticketCode: 1 });
-
 // Compound index for user and event for quick lookups
 TicketSchema.index({ user: 1, event: 1 });
 

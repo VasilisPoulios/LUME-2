@@ -78,6 +78,27 @@ const EventSchema = new mongoose.Schema(
         index: '2dsphere'
       }
     },
+    rsvpCount: {
+      type: Number,
+      default: 0
+    },
+    // Flag fields for admin features
+    isFeatured: {
+      type: Boolean,
+      default: false
+    },
+    isHot: {
+      type: Boolean,
+      default: false
+    },
+    isUnmissable: {
+      type: Boolean,
+      default: false
+    },
+    isPublished: {
+      type: Boolean,
+      default: true
+    },
     createdAt: {
       type: Date,
       default: Date.now

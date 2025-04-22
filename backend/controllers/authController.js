@@ -53,22 +53,38 @@ exports.register = asyncHandler(async (req, res) => {
 exports.login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
+  console.log('Login attempt:', { email, passwordProvided: !!password });
+
   // Validate email & password
   if (!email || !password) {
+    console.log('Missing email or password');
     res.status(400);
     throw new Error('Please provide an email and password');
   }
 
   // Check for user
   const user = await User.findOne({ email }).select('+password');
+  console.log('User found:', user ? 'Yes' : 'No');
+  
+  if (!user) {
+    console.log('User not found with email:', email);
+    res.status(401);
+    throw new Error('Invalid credentials');
+  }
+  
+  // Check password
+  const isMatch = await user.matchPassword(password);
+  console.log('Password match:', isMatch);
 
-  if (!user || !(await user.matchPassword(password))) {
+  if (!isMatch) {
+    console.log('Password does not match');
     res.status(401);
     throw new Error('Invalid credentials');
   }
 
   // Create token
   const token = user.getSignedJwtToken();
+  console.log('Login successful for:', email);
 
   res.status(200).json({
     success: true,

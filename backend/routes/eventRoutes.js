@@ -8,8 +8,12 @@ const {
   searchEvents,
   getEventsByDate,
   getNearbyEvents,
-  createRSVP
+  getPersonalizedEvents,
+  getPastEvents
 } = require('../controllers/eventController');
+
+// Add RSVP controller import
+const { createRSVP } = require('../controllers/rsvpController');
 
 const router = express.Router();
 
@@ -23,8 +27,14 @@ router.get('/search', searchEvents);
 // Events by date
 router.get('/date/:date', getEventsByDate);
 
+// Past events
+router.get('/past', getPastEvents);
+
 // Nearby events
 router.get('/nearby', getNearbyEvents);
+
+// Personalized events - requires authentication
+router.get('/personalized', protect, getPersonalizedEvents);
 
 // Standard event routes
 router
@@ -34,6 +44,7 @@ router
     protect,
     authorize('organizer', 'admin'),
     upload.event.single('image'),
+    upload.handleMulterError,
     createEvent
   );
 
@@ -44,6 +55,7 @@ router
     protect,
     authorize('organizer', 'admin'),
     upload.event.single('image'),
+    upload.handleMulterError,
     updateEvent
   )
   .delete(
@@ -53,6 +65,6 @@ router
   );
 
 // RSVP route
-router.post('/:eventId/rsvp', protect, createRSVP);
+router.post('/:id/rsvp', createRSVP);
 
 module.exports = router; 

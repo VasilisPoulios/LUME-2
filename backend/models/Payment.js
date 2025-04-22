@@ -16,6 +16,11 @@ const PaymentSchema = new mongoose.Schema(
       type: Number,
       required: [true, 'Please add payment amount']
     },
+    quantity: {
+      type: Number,
+      default: 1,
+      min: [1, 'Quantity must be at least 1']
+    },
     paymentIntentId: {
       type: String,
       required: true,
@@ -40,9 +45,8 @@ const PaymentSchema = new mongoose.Schema(
 );
 
 // Indexes for common queries
-PaymentSchema.index({ paymentIntentId: 1 });
 PaymentSchema.index({ user: 1 });
-PaymentSchema.index({ event: 1 });
-PaymentSchema.index({ status: 1 });
+PaymentSchema.index({ paymentIntentId: 1 }, { unique: true });
+PaymentSchema.index({ event: 1, user: 1 });
 
 module.exports = mongoose.model('Payment', PaymentSchema); 
