@@ -56,4 +56,13 @@ API.interceptors.response.use(
   }
 );
 
-export default API; 
+export default API;
+
+export * from './eventService';
+export * from './authService';
+export * from './userService';
+export * from './adminService';
+export * from './paymentService';
+export * from './ticketService';
+export * from './contactService';
+export * from './rsvpService'; 

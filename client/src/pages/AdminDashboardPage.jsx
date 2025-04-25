@@ -68,8 +68,24 @@ function a11yProps(index) {
   };
 }
 
-const AdminDashboardPage = () => {
-  const [activeTab, setActiveTab] = useState(0);
+const AdminDashboardPage = ({ tab }) => {
+  // Map the tab prop string to the tab index
+  const getInitialTabIndex = () => {
+    switch (tab) {
+      case 'users':
+        return 0;
+      case 'organizers':
+        return 1;
+      case 'events':
+        return 2;
+      case 'categories':
+        return 3;
+      default:
+        return 0;
+    }
+  };
+
+  const [activeTab, setActiveTab] = useState(getInitialTabIndex());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [users, setUsers] = useState([]);
@@ -80,6 +96,13 @@ const AdminDashboardPage = () => {
   const { isAuthenticated, user } = useAuth();
   const theme = useTheme();
   const [selectedOrganizerId, setSelectedOrganizerId] = useState(null);
+
+  // Effect to handle tab changes via prop
+  useEffect(() => {
+    if (tab) {
+      setActiveTab(getInitialTabIndex());
+    }
+  }, [tab]);
 
   // Handle tab change
   const handleTabChange = (event, newValue) => {
@@ -246,4 +269,4 @@ const AdminDashboardPage = () => {
   );
 };
 
-export default AdminDashboardPage; 
+export default AdminDashboardPage;

@@ -251,9 +251,9 @@ export const AuthProvider = ({ children }) => {
       case 'admin':
         return '/admin';
       case 'user':
-        return '/discover';
+        return '/dashboard';
       default:
-        return '/discover';
+        return '/dashboard';
     }
   };
 

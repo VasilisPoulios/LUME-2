@@ -1,5 +1,3 @@
-
-
 // Base categories from the backend Event schema
 const BASE_CATEGORIES = [
   'Music',
@@ -41,75 +39,75 @@ const CATEGORY_MAPPING = {
   'Networking': 'Business'
 };
 
-// Categories with emoji and display configuration for UI components
+// Categories with icon configuration for UI components (Material-UI icons)
 const UI_CATEGORIES = [
   { 
     id: 'All', 
     title: 'All Categories', 
-    emoji: '🔍',
+    icon: 'Search',
     backendCategory: null, // Special case
     image: 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?q=80&w=1470&auto=format&fit=crop'
   },
   { 
     id: 'Music', 
     title: 'Music', 
-    emoji: '🎵',
+    icon: 'MusicNote',
     backendCategory: 'Music',
     image: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?q=80&w=1740&auto=format&fit=crop'
   },
   { 
     id: 'Food & Drink', 
     title: 'Food & Drink', 
-    emoji: '🍽️',
+    icon: 'Restaurant',
     backendCategory: 'Food',
     image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=1974&auto=format&fit=crop'
   },
   { 
     id: 'Arts', 
     title: 'Arts', 
-    emoji: '🎨',
+    icon: 'Palette',
     backendCategory: 'Visual Arts',
     image: 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?q=80&w=2080&auto=format&fit=crop'
   },
   { 
     id: 'Sports', 
     title: 'Sports', 
-    emoji: '⚽',
+    icon: 'SportsSoccer',
     backendCategory: 'Sports',
     image: 'https://images.unsplash.com/photo-1547347298-4074fc3086f0?q=80&w=1740&auto=format&fit=crop'
   },
   { 
     id: 'Technology', 
     title: 'Technology', 
-    emoji: '💻',
+    icon: 'Computer',
     backendCategory: 'Technology',
     image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?q=80&w=1740&auto=format&fit=crop'
   },
   { 
     id: 'Community', 
     title: 'Community', 
-    emoji: '🤝',
+    icon: 'People',
     backendCategory: 'Community',
     image: 'https://images.unsplash.com/photo-1511632765486-a01980e01a18?q=80&w=1740&auto=format&fit=crop'
   },
   { 
     id: 'Lectures', 
     title: 'Education', 
-    emoji: '📚',
+    icon: 'School',
     backendCategory: 'Lectures',
     image: 'https://images.unsplash.com/photo-1532012197267-da84d127e765?q=80&w=1374&auto=format&fit=crop'
   },
   { 
     id: 'Film', 
     title: 'Film', 
-    emoji: '🎬',
+    icon: 'Movie',
     backendCategory: 'Film',
     image: 'https://images.unsplash.com/photo-1478720568477-152d9b164e26?q=80&w=1740&auto=format&fit=crop'
   },
   { 
     id: 'Performing Arts', 
     title: 'Performance', 
-    emoji: '🎭',
+    icon: 'Theaters',
     backendCategory: 'Performing Arts',
     image: 'https://images.unsplash.com/photo-1527394015636-afeb66ba5874?q=80&w=1740&auto=format&fit=crop'
   }
@@ -128,7 +126,7 @@ const getFrontendToBackendCategory = (frontendCategory) => {
 /**
  * Get UI display information for a backend category
  * @param {string} backendCategory - The category from the backend
- * @returns {Object} UI display information including title, emoji, etc.
+ * @returns {Object} UI display information including title, icon, etc.
  */
 const getUICategoryInfo = (backendCategory) => {
   if (!backendCategory) return UI_CATEGORIES[0]; // All categories
@@ -151,7 +149,7 @@ const getUICategoryInfo = (backendCategory) => {
   return {
     id: 'Other',
     title: 'Other',
-    emoji: '📌',
+    icon: 'MoreHoriz',
     backendCategory: 'Other',
     image: 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?q=80&w=1470&auto=format&fit=crop'
   };

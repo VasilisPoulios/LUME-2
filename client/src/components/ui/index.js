@@ -6,4 +6,5 @@ export { default as StatsBar } from './StatsBar';
 export { default as LumeButton } from './LumeButton';
 export { default as InterestCard } from './InterestCard';
 export { default as FeaturedCarousel } from './FeaturedCarousel';
-export { default as DashboardLink } from './DashboardLink'; 
+export { default as DashboardLink } from './DashboardLink';
+export { default as PageHeader } from './PageHeader'; 

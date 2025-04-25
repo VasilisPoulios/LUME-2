@@ -629,16 +629,6 @@ const EventsTab = ({ organizerId }) => {
       renderCell: (params) => (
         <Stack direction="row" spacing={1}>
           <Button
-            variant="outlined"
-            color="primary"
-            size="small"
-            startIcon={<EditIcon />}
-            onClick={() => handleEditEvent(params.row.id)}
-            sx={{ minWidth: 'auto' }}
-          >
-            Edit
-          </Button>
-          <Button
             variant="contained"
             color="error"
             size="small"

@@ -1,21 +1,21 @@
 const axios = require('axios');
 require('dotenv').config();
 
-// Test admin login
+// Admin credentials with the reset password
 const adminCredentials = {
-  email: 'admin123@lume.com',
-  password: 'password123'
+  email: 'admin@test.com',
+  password: 'password'
 };
 
 const testLogin = async () => {
   try {
     console.log('Testing login with credentials:', {
       email: adminCredentials.email,
-      password: adminCredentials.password
+      password: 'Password provided (not showing for security)'
     });
     
     // Get API URL from environment or use default
-    const baseURL = process.env.API_BASE_URL || 'http://localhost:5000/api';
+    const baseURL = process.env.API_BASE_URL || 'http://localhost:4010/api';
     
     console.log(`Making request to: ${baseURL}/auth/login`);
     
@@ -35,33 +35,15 @@ const testLogin = async () => {
       } : '(no user data)'
     });
     
-    console.log('\nUse these credentials in the login form:');
-    console.log(`Email: ${adminCredentials.email}`);
-    console.log(`Password: ${adminCredentials.password}`);
-    
   } catch (error) {
     console.error('Login failed!');
-    
-    if (error.response) {
-      // The request was made and the server responded with a status code
-      // that falls out of the range of 2xx
-      console.error('Response status:', error.response.status);
-      console.error('Response data:', error.response.data);
-    } else if (error.request) {
-      // The request was made but no response was received
-      console.error('No response received:', error.request);
-    } else {
-      // Something happened in setting up the request that triggered an Error
-      console.error('Error:', error.message);
-    }
-    
-    console.error('\nPossible issues:');
-    console.error('1. Backend server not running');
-    console.error('2. Incorrect API URL');
-    console.error('3. Incorrect credentials');
-    console.error('4. Authentication middleware issues');
+    console.error('Error:', {
+      status: error.response?.status,
+      message: error.response?.data?.message || error.message
+    });
   }
 };
 
 // Run the test
+console.log('Starting login test...');
 testLogin(); 

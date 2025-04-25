@@ -1,7 +1,7 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { Elements } from '@stripe/react-stripe-js';
-import { stripePromise, stripeOptions } from './config/stripe';
+import { stripePromise } from './config/stripe';
 
 // Pages
 import HomePage from './pages/HomePage';
@@ -18,23 +18,32 @@ import OrganizerDashboardPage from './pages/OrganizerDashboardPage';
 import CreateEventPage from './pages/CreateEventPage';
 import NotFound from './pages/NotFound';
 import AdminDashboardPage from './pages/AdminDashboardPage';
+import AboutPage from './pages/AboutPage';
+import ContactPage from './pages/ContactPage';
 
 // Components
-import Layout from './components/layout/index.jsx';
+import Layout from './components/layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import ProtectedRouteAdmin from './components/ProtectedRouteAdmin';
 import ThemeTest from './components/ThemeTest';
+import PlaceholderPage from './components/PlaceholderPage';
 
 const AppRoutes = () => {
   return (
-    <Elements stripe={stripePromise} options={stripeOptions}>
+    <Elements stripe={stripePromise}>
       <Routes>
         {/* Routes using the shared layout */}
-        <Route path="/" element={<Layout />}>
-          <Route index element={<HomePage />} />
+        <Route element={<Layout />}>
+          <Route path="/" element={<HomePage />} />
           <Route path="discover" element={<DiscoverPage />} />
           <Route path="categories" element={<CategoriesPage />} />
           <Route path="events/:id" element={<EventDetailPage />} />
+          <Route path="about" element={<AboutPage />} />
+          <Route path="contact" element={<ContactPage />} />
+          {/* Placeholder routes for footer links */}
+          <Route path="faq" element={<PlaceholderPage title="Frequently Asked Questions" />} />
+          <Route path="privacy-policy" element={<PlaceholderPage title="Privacy Policy" />} />
+          <Route path="promote-event" element={<PlaceholderPage title="Promote Your Event" />} />
           <Route path="checkout/:eventId" element={
             <ProtectedRoute>
               <CheckoutPage />
@@ -71,6 +80,16 @@ const AppRoutes = () => {
               <OrganizerDashboardPage />
             </ProtectedRoute>
           } />
+          <Route path="organizer/events" element={
+            <ProtectedRoute allowedRoles={['organizer', 'admin']}>
+              <OrganizerDashboardPage />
+            </ProtectedRoute>
+          } />
+          <Route path="organizer/events/create" element={
+            <ProtectedRoute allowedRoles={['organizer', 'admin']}>
+              <CreateEventPage />
+            </ProtectedRoute>
+          } />
           <Route path="create-event" element={
             <ProtectedRoute allowedRoles={['organizer', 'admin']}>
               <CreateEventPage />
@@ -86,6 +105,21 @@ const AppRoutes = () => {
           <Route path="admin" element={
             <ProtectedRouteAdmin>
               <AdminDashboardPage />
+            </ProtectedRouteAdmin>
+          } />
+          <Route path="admin/users" element={
+            <ProtectedRouteAdmin>
+              <AdminDashboardPage tab="users" />
+            </ProtectedRouteAdmin>
+          } />
+          <Route path="admin/events" element={
+            <ProtectedRouteAdmin>
+              <AdminDashboardPage tab="events" />
+            </ProtectedRouteAdmin>
+          } />
+          <Route path="admin/categories" element={
+            <ProtectedRouteAdmin>
+              <AdminDashboardPage tab="categories" />
             </ProtectedRouteAdmin>
           } />
           

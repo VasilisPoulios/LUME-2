@@ -754,7 +754,7 @@ const DiscoverPage = () => {
           <Container maxWidth="lg">
             <EnhancedSectionHeader 
               title="🔥 Hot Right Now" 
-              subtitle="These events are trending fast — before tickets vanish"
+              subtitle="These events are trending fast, Grab a ticket before they vanish"
               align="left"
             />
             <FeaturedEventShowcase featuredEvents={hotEvents} />

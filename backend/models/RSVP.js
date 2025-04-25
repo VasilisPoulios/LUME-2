@@ -23,6 +23,15 @@ const rsvpSchema = new mongoose.Schema({
     min: 1,
     max: 10
   },
+  checkedInGuests: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  lastCheckedInAt: {
+    type: Date,
+    default: null
+  },
   createdAt: {
     type: Date,
     default: Date.now

@@ -171,7 +171,8 @@ const CreateEventPage = () => {
       errors.ticketsAvailable = 'Number of tickets must be greater than 0';
     }
     
-    if (!imageFile) {
+    // Only require image for new events, not for edits
+    if (!isEditMode && !imageFile && !imagePreview) {
       errors.image = 'Event image is required';
     }
     
@@ -284,10 +285,10 @@ const CreateEventPage = () => {
       formDataObj.append('address', formData.address);
       formDataObj.append('startDateTime', startDateTime.toISOString());
       formDataObj.append('endDateTime', endDateTime.toISOString());
-      formDataObj.append('price', formData.isPaid ? formData.price : 0);
+      formDataObj.append('price', formData.isPaid ? Math.round(formData.price * 100) : 0); // Convert to cents
       formDataObj.append('ticketsAvailable', formData.ticketsAvailable);
       
-      // Add image if available
+      // Add image if available (only if a new image was selected)
       if (imageFile) {
         formDataObj.append('image', imageFile);
         console.log('Uploading image:', { 
@@ -299,23 +300,40 @@ const CreateEventPage = () => {
       
       let response;
       
-      // Call API to create event
-      response = await API.post('/events', formDataObj, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      if (isEditMode) {
+        // Update existing event
+        response = await API.put(`/events/${eventId}`, formDataObj, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        });
+        
+        // Show success message
+        showSnackbar('Event updated successfully!');
+        console.log('Event updated successfully:', response.data);
+        
+        // Redirect to event page
+        const updatedEventId = response.data.data?._id || eventId;
+        navigate(`/events/${updatedEventId}`);
+      } else {
+        // Create new event
+        response = await API.post('/events', formDataObj, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        });
 
-      // Show success message
-      showSnackbar('Event created successfully!');
-      console.log('Event created successfully:', response.data);
-      
-      // Redirect to event page
-      navigate(`/events/${response.data.data._id}`);
+        // Show success message
+        showSnackbar('Event created successfully!');
+        console.log('Event created successfully:', response.data);
+        
+        // Redirect to event page
+        navigate(`/events/${response.data.data._id}`);
+      }
     } catch (error) {
-      console.error('Error creating event:', error);
-      setError(error.response?.data?.message || 'Failed to create event');
-      showSnackbar(error.response?.data?.message || 'Failed to create event', 'error');
+      console.error(`Error ${isEditMode ? 'updating' : 'creating'} event:`, error);
+      setError(error.response?.data?.message || `Failed to ${isEditMode ? 'update' : 'create'} event`);
+      showSnackbar(error.response?.data?.message || `Failed to ${isEditMode ? 'update' : 'create'} event`, 'error');
     } finally {
       setLoading(false);
     }
@@ -353,11 +371,21 @@ const CreateEventPage = () => {
             startTime = formatTime(startDateObj);
           }
           
+          // Map backend category to frontend category ID
+          let categoryId = eventData.category || '';
+          // Try to find the matching frontend category
+          const matchingCategory = categories.find(cat => 
+            cat.backendCategory === eventData.category || cat.id === eventData.category
+          );
+          if (matchingCategory) {
+            categoryId = matchingCategory.id;
+          }
+          
           // Populate form data
           setFormData({
             title: eventData.title || '',
             description: eventData.description || '',
-            category: eventData.category || '',
+            category: categoryId,
             venue: eventData.venue || '',
             address: eventData.address || '',
             startDate,
@@ -776,6 +804,343 @@ const CreateEventPage = () => {
     }
   };
 
+  // Render form content (different for edit mode vs create mode)
+  const renderFormContent = () => {
+    // For edit mode, render all fields at once
+    if (isEditMode) {
+      return (
+        <Grid container spacing={3}>
+          {/* Event Details Section */}
+          <Grid item xs={12}>
+            <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: COLORS.SLATE }}>
+              Event Details
+            </Typography>
+          </Grid>
+          
+          <Grid item xs={12}>
+            <TextField
+              required
+              fullWidth
+              id="title"
+              label="Event Title"
+              name="title"
+              value={formData.title}
+              onChange={handleChange}
+              disabled={loading}
+              error={!!formErrors.title}
+              helperText={formErrors.title || `${formData.title.length}/30 characters`}
+              autoFocus
+              inputProps={{ maxLength: 30 }}
+              sx={{ backgroundColor: 'white' }}
+            />
+          </Grid>
+          
+          <Grid item xs={12}>
+            <TextField
+              required
+              fullWidth
+              id="description"
+              label="Event Description"
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              disabled={loading}
+              error={!!formErrors.description}
+              helperText={formErrors.description || `${formData.description.length}/200 characters`}
+              multiline
+              rows={4}
+              inputProps={{ maxLength: 200 }}
+              sx={{ backgroundColor: 'white' }}
+            />
+          </Grid>
+          
+          <Grid item xs={12}>
+            <Box sx={{ mb: 1 }}>
+              <Typography variant="subtitle1" fontWeight="500" color="text.primary">
+                Category <Box component="span" color="error.main">*</Box>
+              </Typography>
+            </Box>
+            <TextField
+              select
+              required
+              fullWidth
+              id="category"
+              name="category"
+              value={formData.category}
+              onChange={handleChange}
+              disabled={loading}
+              error={!!formErrors.category}
+              helperText={formErrors.category}
+              placeholder="Select a category"
+              variant="outlined"
+              sx={{ 
+                backgroundColor: 'white',
+                '& .MuiSelect-select': {
+                  py: 1.5,
+                  fontSize: '1rem'
+                }
+              }}
+              SelectProps={{
+                displayEmpty: true,
+                renderValue: (selected) => {
+                  if (!selected) {
+                    return <Typography color="text.secondary">Select a category</Typography>;
+                  }
+                  const selectedCategory = categories.find(cat => cat.id === selected);
+                  return selectedCategory ? selectedCategory.title : selected;
+                },
+                MenuProps: {
+                  PaperProps: {
+                    style: {
+                      maxHeight: 300,
+                    },
+                  },
+                },
+              }}
+            >
+              <MenuItem disabled value="">
+                <em>Select a category</em>
+              </MenuItem>
+              {categories.map((option) => (
+                <MenuItem key={option.id} value={option.id}>
+                  {option.title}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+          
+          {/* Date & Location Section */}
+          <Grid item xs={12}>
+            <Divider sx={{ my: 2 }} />
+            <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: COLORS.SLATE }}>
+              Date & Location
+            </Typography>
+          </Grid>
+          
+          <Grid item xs={12} sm={6}>
+            <TextField
+              required
+              fullWidth
+              id="venue"
+              label="Venue Name"
+              name="venue"
+              value={formData.venue}
+              onChange={handleChange}
+              disabled={loading}
+              error={!!formErrors.venue}
+              helperText={formErrors.venue}
+              sx={{ backgroundColor: 'white' }}
+            />
+          </Grid>
+          
+          <Grid item xs={12} sm={6}>
+            <TextField
+              required
+              fullWidth
+              id="address"
+              label="Address"
+              name="address"
+              value={formData.address}
+              onChange={handleChange}
+              disabled={loading}
+              error={!!formErrors.address}
+              helperText={formErrors.address}
+              sx={{ backgroundColor: 'white' }}
+            />
+          </Grid>
+          
+          <Grid item xs={12} sm={6}>
+            <TextField
+              required
+              fullWidth
+              id="startDate"
+              label="Event Date"
+              name="startDate"
+              type="date"
+              value={formData.startDate}
+              onChange={handleChange}
+              disabled={loading}
+              error={!!formErrors.startDate}
+              helperText={formErrors.startDate}
+              InputLabelProps={{ shrink: true }}
+              sx={{ backgroundColor: 'white' }}
+            />
+          </Grid>
+          
+          <Grid item xs={12} sm={6}>
+            <TextField
+              required
+              fullWidth
+              id="startTime"
+              label="Event Time"
+              name="startTime"
+              type="time"
+              value={formData.startTime}
+              onChange={handleChange}
+              disabled={loading}
+              error={!!formErrors.startTime}
+              helperText={formErrors.startTime}
+              InputLabelProps={{ shrink: true }}
+              sx={{ backgroundColor: 'white' }}
+            />
+          </Grid>
+          
+          {/* Tickets & Image Section */}
+          <Grid item xs={12}>
+            <Divider sx={{ my: 2 }} />
+            <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: COLORS.SLATE }}>
+              Tickets & Image
+            </Typography>
+          </Grid>
+          
+          <Grid item xs={12} sm={6}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={formData.isPaid}
+                  onChange={handleChange}
+                  name="isPaid"
+                  color="primary"
+                  disabled={loading}
+                />
+              }
+              label={<Typography fontWeight="500">Paid Event</Typography>}
+            />
+          </Grid>
+          
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              id="price"
+              label="Ticket Price"
+              name="price"
+              type="number"
+              InputProps={{
+                startAdornment: <InputAdornment position="start">€</InputAdornment>,
+              }}
+              value={formData.price}
+              onChange={handleChange}
+              disabled={loading || !formData.isPaid}
+              error={!!formErrors.price}
+              helperText={formErrors.price}
+              inputProps={{ min: 0, step: 0.01 }}
+              sx={{ backgroundColor: 'white' }}
+            />
+          </Grid>
+          
+          <Grid item xs={12} sm={6}>
+            <TextField
+              required
+              fullWidth
+              id="ticketsAvailable"
+              label="Number of Tickets Available"
+              name="ticketsAvailable"
+              type="number"
+              value={formData.ticketsAvailable}
+              onChange={handleChange}
+              disabled={loading}
+              error={!!formErrors.ticketsAvailable}
+              helperText={formErrors.ticketsAvailable}
+              inputProps={{ min: 1 }}
+              sx={{ backgroundColor: 'white' }}
+            />
+          </Grid>
+          
+          <Grid item xs={12}>
+            <Card elevation={0} sx={{ 
+              mt: 2, 
+              p: 3, 
+              border: '1px dashed',
+              borderColor: formErrors.image ? 'error.main' : 'divider',
+              borderRadius: 2
+            }}>
+              <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 500 }}>
+                Event Image {!isEditMode && <Box component="span" color="error.main">*</Box>}
+              </Typography>
+              
+              {imagePreview ? (
+                <Box sx={{ position: 'relative', mb: 2 }}>
+                  <CardMedia
+                    component="img"
+                    height="200"
+                    image={imagePreview}
+                    alt="Event image preview"
+                    sx={{ 
+                      objectFit: 'cover', 
+                      borderRadius: 1,
+                      mb: 2
+                    }}
+                  />
+                  <Button
+                    variant="contained"
+                    component="label"
+                    startIcon={<CloudUploadIcon />}
+                    sx={{ 
+                      bgcolor: 'rgba(0,0,0,0.6)',
+                      '&:hover': {
+                        bgcolor: 'rgba(0,0,0,0.8)',
+                      }
+                    }}
+                  >
+                    Change Image
+                    <input
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      onChange={handleImageUpload}
+                    />
+                  </Button>
+                </Box>
+              ) : (
+                <Box sx={{ 
+                  display: 'flex', 
+                  flexDirection: 'column',
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  p: 3,
+                  bgcolor: 'rgba(0,0,0,0.02)',
+                  borderRadius: 1
+                }}>
+                  <Button
+                    variant="contained"
+                    component="label"
+                    startIcon={<CloudUploadIcon />}
+                    sx={{ 
+                      bgcolor: COLORS.ORANGE_MAIN,
+                      '&:hover': {
+                        bgcolor: COLORS.ORANGE_DARK,
+                      }
+                    }}
+                  >
+                    Select Image
+                    <input
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      onChange={handleImageUpload}
+                    />
+                  </Button>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                    Maximum file size: 5MB
+                  </Typography>
+                </Box>
+              )}
+              
+              {formErrors.image && (
+                <Typography color="error" variant="caption" sx={{ display: 'block', mt: 1 }}>
+                  {formErrors.image}
+                </Typography>
+              )}
+            </Card>
+          </Grid>
+        </Grid>
+      );
+    }
+    
+    // For create mode, use stepper approach
+    return renderStepContent(activeStep);
+  };
+
   return (
     <Container maxWidth="md" sx={{ py: 6 }}>
       <Paper elevation={0} sx={{ p: { xs: 2, sm: 4 }, borderRadius: 2, border: `1px solid ${COLORS.GRAY_LIGHT}`, bgcolor: '#fafafa' }}>
@@ -839,57 +1204,93 @@ const CreateEventPage = () => {
           </Alert>
         )}
 
-        <Stepper 
-          activeStep={activeStep} 
-          sx={{ 
-            mb: 4,
-            p: 2,
-            bgcolor: 'white',
-            borderRadius: 1,
-            border: '1px solid',
-            borderColor: 'divider'
-          }}
-        >
-          {steps.map((label) => (
-            <Step key={label}>
-              <StepLabel>{label}</StepLabel>
-            </Step>
-          ))}
-        </Stepper>
+        {!isEditMode && (
+          <Stepper 
+            activeStep={activeStep} 
+            sx={{ 
+              mb: 4,
+              p: 2,
+              bgcolor: 'white',
+              borderRadius: 1,
+              border: '1px solid',
+              borderColor: 'divider'
+            }}
+          >
+            {steps.map((label) => (
+              <Step key={label}>
+                <StepLabel>{label}</StepLabel>
+              </Step>
+            ))}
+          </Stepper>
+        )}
 
         <Box component="form" noValidate>
-          {renderStepContent(activeStep)}
+          {renderFormContent()}
 
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-            <Button
-              variant="outlined"
-              disabled={activeStep === 0 || loading}
-              onClick={handleBack}
-              sx={{
-                px: 3,
-                py: 1
-              }}
-            >
-              Back
-            </Button>
-            <Button
-              variant="contained"
-              onClick={handleStepTransition}
-              disabled={loading}
-              startIcon={loading ? <CircularProgress size={20} color="inherit" /> : (activeStep === steps.length - 1 ? <CheckIcon /> : null)}
-              sx={{ 
-                bgcolor: COLORS.ORANGE_MAIN,
-                '&:hover': {
-                  bgcolor: COLORS.ORANGE_DARK,
-                },
-                px: 3,
-                py: 1
-              }}
-            >
-              {activeStep === steps.length - 1 
-                ? (isEditMode ? 'Update Event' : 'Create Event') 
-                : 'Next'}
-            </Button>
+            {isEditMode ? (
+              // Edit mode - Cancel and Update buttons
+              <>
+                <Button
+                  variant="outlined"
+                  onClick={() => navigate(-1)}
+                  disabled={loading}
+                  sx={{
+                    px: 3,
+                    py: 1
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={handleSubmit}
+                  disabled={loading}
+                  startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <CheckIcon />}
+                  sx={{ 
+                    bgcolor: COLORS.ORANGE_MAIN,
+                    '&:hover': {
+                      bgcolor: COLORS.ORANGE_DARK,
+                    },
+                    px: 3,
+                    py: 1
+                  }}
+                >
+                  {loading ? 'Updating...' : 'Update Event'}
+                </Button>
+              </>
+            ) : (
+              // Create mode - Back and Next/Create buttons
+              <>
+                <Button
+                  variant="outlined"
+                  disabled={activeStep === 0 || loading}
+                  onClick={handleBack}
+                  sx={{
+                    px: 3,
+                    py: 1
+                  }}
+                >
+                  Back
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={handleStepTransition}
+                  disabled={loading}
+                  startIcon={loading ? <CircularProgress size={20} color="inherit" /> : (activeStep === steps.length - 1 ? <CheckIcon /> : null)}
+                  sx={{ 
+                    bgcolor: COLORS.ORANGE_MAIN,
+                    '&:hover': {
+                      bgcolor: COLORS.ORANGE_DARK,
+                    },
+                    px: 3,
+                    py: 1
+                  }}
+                >
+                  {activeStep === steps.length - 1 ? 'Create Event' : 'Next'}
+                </Button>
+              </>
+            )}
           </Box>
         </Box>
       </Paper>

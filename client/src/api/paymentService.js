@@ -89,8 +89,9 @@ export const confirmPayment = async (paymentIntentId, eventId) => {
  */
 export const getPaymentHistory = async () => {
   try {
-    const response = await api.get('/payments/history');
-    return { success: true, data: response.data };
+    // This endpoint doesn't exist, use the tickets endpoint instead
+    const response = await api.get('/tickets/user');
+    return { success: true, data: response.data.data || response.data };
   } catch (error) {
     console.error('Error fetching payment history:', error);
     return { 
@@ -101,19 +102,27 @@ export const getPaymentHistory = async () => {
 };
 
 /**
- * Get payment details by ID
- * @param {string} paymentId - The payment ID
+ * Get ticket details by code
+ * @param {string} ticketCode - The ticket code
  * @returns {Promise<Object>} Response object with success status and data or error message
  */
-export const getPaymentDetails = async (paymentId) => {
+export const getPaymentDetails = async (ticketCode) => {
   try {
-    const response = await api.get(`/payments/${paymentId}`);
-    return { success: true, data: response.data };
+    console.log(`Fetching ticket details for code: ${ticketCode}`);
+    
+    // Use the correct API endpoint
+    const response = await api.get(`/tickets/details/${ticketCode}`);
+    console.log('Ticket details response:', response.data);
+    
+    return { 
+      success: true, 
+      data: response.data.data || response.data 
+    };
   } catch (error) {
-    console.error('Error fetching payment details:', error);
+    console.error('Error fetching ticket details:', error);
     return { 
       success: false, 
-      message: error.response?.data?.message || 'Failed to fetch payment details'
+      message: error.response?.data?.message || 'Ticket not found' 
     };
   }
 };

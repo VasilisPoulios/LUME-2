@@ -17,11 +17,25 @@ exports.getAllUsers = asyncHandler(async (req, res, next) => {
   const endIndex = page * limit;
   const total = await User.countDocuments();
   
-  // Build query
-  const query = User.find().select('-password').sort({ createdAt: -1 }).skip(startIndex).limit(limit);
+  // Build query - explicitly select fields we need including createdAt
+  const query = User.find()
+    .select('_id name email role createdAt')
+    .sort({ createdAt: -1 })
+    .skip(startIndex)
+    .limit(limit);
   
   // Execute query
   const users = await query;
+  
+  // Ensure all users have createdAt
+  const processedUsers = users.map(user => {
+    const userObj = user.toObject();
+    // Make sure createdAt is defined, default to current date if missing
+    if (!userObj.createdAt) {
+      userObj.createdAt = new Date();
+    }
+    return userObj;
+  });
   
   // Pagination result
   const pagination = {};
@@ -42,9 +56,9 @@ exports.getAllUsers = asyncHandler(async (req, res, next) => {
   
   res.status(200).json({
     success: true,
-    count: users.length,
+    count: processedUsers.length,
     pagination,
-    data: users
+    data: processedUsers
   });
 });
 
@@ -318,4 +332,4 @@ exports.getReports = asyncHandler(async (req, res, next) => {
     message: 'Reports feature coming soon',
     data: []
   });
-}); 
+});

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import {
   AppBar,
@@ -16,8 +16,9 @@ import {
   useTheme
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
-import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { LogoText } from '../../styles';
+import { DashboardLink } from '../ui';
 
 const Navbar = () => {
   const theme = useTheme();
@@ -25,7 +26,7 @@ const Navbar = () => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
-  const { user, logout } = useAuth() || { user: null, logout: () => {} }; // Provide default values
+  const { user, logout, isAuthenticated, isOrganizer, getDashboardRoute } = useAuth();
 
   const handleMenu = (event) => {
     setAnchorEl(event.currentTarget);
@@ -40,31 +41,30 @@ const Navbar = () => {
   };
 
   const handleLogout = () => {
-    if (logout) {
-      logout();
-      navigate('/');
-    }
+    logout();
     handleClose();
   };
+
+  // Get the appropriate dashboard path
+  const dashboardPath = getDashboardRoute();
 
   return (
     <AppBar position="static" color="transparent" elevation={0}>
       <Container maxWidth="xl">
         <Toolbar disableGutters>
-          {/* Logo - using text instead of image */}
-          <RouterLink to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
-            <Typography
-              variant="h5"
+          {/* Logo - using LogoText component */}
+          <RouterLink to="/">
+            <LogoText
+              variant="h6"
               noWrap
               sx={{
+                mr: 2,
                 fontWeight: 700,
-                color: 'primary.main',
                 textDecoration: 'none',
-                letterSpacing: '.1rem'
               }}
             >
               LUME
-            </Typography>
+            </LogoText>
           </RouterLink>
 
           {/* Desktop Navigation */}
@@ -121,8 +121,13 @@ const Navbar = () => {
               )}
               {user ? (
                 <>
-                  <MenuItem component={RouterLink} to={user.role === 'admin' ? '/admin' : '/dashboard'} onClick={() => setMobileMenuOpen(false)}>
-                    Dashboard
+                  <MenuItem onClick={() => setMobileMenuOpen(false)}>
+                    <DashboardLink>
+                      Dashboard
+                    </DashboardLink>
+                  </MenuItem>
+                  <MenuItem component={RouterLink} to="/tickets" onClick={() => setMobileMenuOpen(false)}>
+                    My Tickets
                   </MenuItem>
                   <MenuItem onClick={() => { handleLogout(); setMobileMenuOpen(false); }}>
                     Logout
@@ -166,14 +171,11 @@ const Navbar = () => {
                   open={Boolean(anchorEl)}
                   onClose={handleClose}
                 >
-                  <MenuItem component={RouterLink} to={user.role === 'admin' ? '/admin' : '/dashboard'} onClick={handleClose}>
-                    Dashboard
+                  <MenuItem onClick={handleClose}>
+                    <DashboardLink>
+                      Dashboard
+                    </DashboardLink>
                   </MenuItem>
-                  {user.role === 'organizer' && (
-                    <MenuItem component={RouterLink} to="/organizer" onClick={handleClose}>
-                      Organizer Dashboard
-                    </MenuItem>
-                  )}
                   <MenuItem component={RouterLink} to="/tickets" onClick={handleClose}>
                     My Tickets
                   </MenuItem>
@@ -202,5 +204,3 @@ const Navbar = () => {
     </AppBar>
   );
 };
-
-export default Navbar; 

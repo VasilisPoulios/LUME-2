@@ -1,9 +1,12 @@
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Box } from '@mui/material';
 import Header from './Header';
 import Footer from './Footer';
 
 const Layout = () => {
+  const location = useLocation();
+  const isHomePage = location.pathname === '/';
+  
   return (
     <Box
       sx={{
@@ -12,7 +15,7 @@ const Layout = () => {
         minHeight: '100vh',
       }}
     >
-      <Header />
+      {!isHomePage && <Header />}
       <Box
         component="main"
         sx={{

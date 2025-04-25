@@ -64,20 +64,82 @@ const TicketsList = ({ tickets }) => {
   };
 
   // Download QR code as PNG
-  const downloadQR = (ticketId, eventTitle) => {
-    const canvas = document.getElementById(`qr-code-${ticketId}`);
-    if (canvas) {
-      const pngUrl = canvas
-        .toDataURL('image/png')
-        .replace('image/png', 'image/octet-stream');
-      
+  const downloadQR = (ticketId, eventTitle, qrCodeData) => {
+    console.log('Downloading QR code for ticket:', ticketId);
+    
+    // If we have qrCodeData from the server, use it directly
+    if (qrCodeData) {
+      console.log('Using server-generated QR code data');
       const downloadLink = document.createElement('a');
-      downloadLink.href = pngUrl;
+      downloadLink.href = qrCodeData;
       downloadLink.download = `ticket-${eventTitle.replace(/\s+/g, '-').toLowerCase()}.png`;
       document.body.appendChild(downloadLink);
       downloadLink.click();
       document.body.removeChild(downloadLink);
+      return;
     }
+    
+    // Otherwise, try to get canvas element for client-generated QR
+    console.log('Looking for canvas element:', `qr-code-${ticketId}`);
+    const canvas = document.getElementById(`qr-code-${ticketId}`);
+    if (canvas) {
+      console.log('Found canvas element, converting to data URL');
+      try {
+        const pngUrl = canvas
+          .toDataURL('image/png')
+          .replace('image/png', 'image/octet-stream');
+        
+        const downloadLink = document.createElement('a');
+        downloadLink.href = pngUrl;
+        downloadLink.download = `ticket-${eventTitle.replace(/\s+/g, '-').toLowerCase()}.png`;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        console.log('Download initiated');
+      } catch (error) {
+        console.error('Error generating download from canvas:', error);
+        alert('Failed to download QR code. Please try again.');
+      }
+    } else {
+      console.error('QR code element not found');
+      alert('Could not find QR code to download. Please try again.');
+    }
+  };
+
+  // Handle QR code rendering
+  const renderQRCode = (ticket) => {
+    // If the server has already generated a QR code, use it
+    if (ticket.qrCodeData) {
+      console.log(`Using server QR for ticket ${ticket._id}`);
+      return (
+        <Box 
+          component="img" 
+          src={ticket.qrCodeData}
+          alt={`QR Code for ticket ${ticket.ticketCode}`}
+          id={`qr-code-img-${ticket._id}`}
+          sx={{ 
+            width: 180, 
+            height: 180,
+            border: `1px solid ${COLORS.GRAY_LIGHT}`,
+            borderRadius: 2,
+            padding: 1
+          }}
+        />
+      );
+    }
+    
+    // Otherwise, generate one client-side
+    console.log(`Generating client QR for ticket ${ticket._id}`);
+    return (
+      <QRCode
+        id={`qr-code-${ticket._id}`}
+        value={ticket.ticketCode}
+        size={180}
+        level="H"
+        includeMargin={true}
+        renderAs="canvas"
+      />
+    );
   };
 
   return (
@@ -226,26 +288,13 @@ const TicketsList = ({ tickets }) => {
                       mb: 2
                     }}
                   >
-                    <QRCode
-                      id={`qr-code-${ticket._id}`}
-                      value={JSON.stringify({
-                        ticketId: ticket._id,
-                        eventId: ticket.event?._id,
-                        userId: ticket.user,
-                        quantity: ticket.quantity,
-                        timestamp: Date.now()
-                      })}
-                      size={180}
-                      level="H"
-                      includeMargin={true}
-                      renderAs="canvas"
-                    />
+                    {renderQRCode(ticket)}
                   </Box>
                   
                   <Button
                     variant="outlined"
                     startIcon={<Download />}
-                    onClick={() => downloadQR(ticket._id, ticket.event?.title || 'Event')}
+                    onClick={() => downloadQR(ticket._id, ticket.event?.title || 'Event', ticket.qrCodeData)}
                     sx={{
                       borderColor: COLORS.ORANGE_MAIN,
                       color: COLORS.ORANGE_MAIN,

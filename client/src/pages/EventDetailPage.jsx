@@ -190,7 +190,33 @@ const EventDetailPage = () => {
   };
 
   const handleRSVP = () => {
+    // Check if user is authenticated
+    if (!user) {
+      // Redirect to login with message
+      navigate('/login', {
+        state: {
+          message: "Please log in to RSVP for this event.",
+          from: `/events/${id}`
+        }
+      });
+      return;
+    }
+    
+    // If user is authenticated, open the RSVP form
     setRsvpOpen(true);
+  };
+
+  // Define the fetchEvent function used in handleRSVPSuccess
+  const fetchEvent = async () => {
+    try {
+      const response = await getEvent(id);
+      if (response.success && response.data) {
+        setEvent(response.data.data || response.data);
+        setHasTicketOrRsvp(true);
+      }
+    } catch (err) {
+      console.error('Error refreshing event data:', err);
+    }
   };
 
   const handleRSVPSuccess = () => {
@@ -386,6 +412,9 @@ const EventDetailPage = () => {
   // User authentication check
   const isUserAuthenticated = () => !!user;
   const hasRSVPd = hasTicketOrRsvp;
+
+  // New logic for free events
+  const isEventFree = event ? event.price === 0 : false;
 
   return (
     <div>
@@ -824,7 +853,7 @@ const EventDetailPage = () => {
                       fontWeight={600}
                       color={COLORS.SLATE}
                     >
-                      {event.isFree ? 'Free Event' : (
+                      {isEventFree ? 'Free Event' : (
                         <>
                           €{formatPrice(event.price || 0)}
                           <Typography 
@@ -853,7 +882,7 @@ const EventDetailPage = () => {
 
                 {/* Ticket Form */}
                 <form>
-                  {!event.isFree && (
+                  {!isEventFree && (
                     <Box sx={{ mb: 3 }}>
                       <Typography 
                         variant="subtitle2" 
@@ -926,7 +955,7 @@ const EventDetailPage = () => {
                   )}
                   
                   {/* Price Summary for paid events */}
-                  {!event.isFree && quantity > 0 && (
+                  {!isEventFree && quantity > 0 && (
                     <Paper 
                       elevation={0}
                       sx={{ 
@@ -969,7 +998,7 @@ const EventDetailPage = () => {
                       variant="contained"
                       size="large"
                       disabled={!isAvailable || rsvpLoading || checkoutLoading || hasRSVPd}
-                      onClick={event.isFree ? handleRSVP : handleBuyTicket}
+                      onClick={isEventFree ? handleRSVP : handleBuyTicket}
                       sx={{
                         bgcolor: COLORS.ORANGE_MAIN,
                         '&:hover': { bgcolor: COLORS.ORANGE_DARK },
@@ -986,7 +1015,7 @@ const EventDetailPage = () => {
                         <CircularProgress size={24} color="inherit" />
                       ) : hasRSVPd ? (
                         "You're attending"
-                      ) : event.isFree ? (
+                      ) : isEventFree ? (
                         "RSVP Now"
                       ) : (
                         `Buy Tickets - €${formatPrice((event.price || 0) * quantity)}`
@@ -1006,7 +1035,7 @@ const EventDetailPage = () => {
                         boxShadow: '0 4px 12px rgba(255, 129, 0, 0.15)',
                       }}
                     >
-                      Login to {event.isFree ? 'RSVP' : 'Buy Tickets'}
+                      Login to {isEventFree ? 'RSVP' : 'Buy Tickets'}
                     </Button>
                   )}
                 </form>

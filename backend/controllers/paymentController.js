@@ -15,7 +15,7 @@ const Event = require('../models/Event');
 const Payment = require('../models/Payment');
 const Ticket = require('../models/Ticket');
 const asyncHandler = require('express-async-handler');
-const { generateTicketCode } = require('../utils/ticketUtils');
+const { generateTicketCode, generateTicketQR } = require('../utils/ticketUtils');
 
 // Debug: Log the Stripe key (first few characters only)
 console.log('Stripe Key:', process.env.STRIPE_SECRET_KEY ? process.env.STRIPE_SECRET_KEY.substring(0, 10) + '...' : 'Not found');
@@ -241,10 +241,13 @@ const confirmPaymentAfterRecord = async (req, res, payment, paymentIntent) => {
     }
 
     // Create tickets - one for each quantity
-    console.log(`Creating ${quantity} tickets`);
+    console.log(`Creating ${quantity} tickets with QR codes`);
     const tickets = [];
+
     for (let i = 0; i < quantity; i++) {
       const ticketCode = generateTicketCode();
+      
+      // Create the ticket first to get its ID
       const ticket = await Ticket.create({
         user: req.user.id,
         event: event._id,
@@ -253,6 +256,30 @@ const confirmPaymentAfterRecord = async (req, res, payment, paymentIntent) => {
         isUsed: false,
         status: 'active'
       });
+      
+      // Generate QR code for the ticket
+      try {
+        const qrCodeData = await generateTicketQR(
+          ticket._id.toString(),
+          ticket.ticketCode,
+          event._id.toString()
+        );
+        
+        // Update the ticket with the QR code data
+        ticket.qrCodeData = qrCodeData;
+        await ticket.save();
+        
+        // Verify QR code was saved
+        const savedTicket = await Ticket.findById(ticket._id);
+        console.log(`QR code saved successfully: ${savedTicket.qrCodeData ? 'Yes' : 'No'}`);
+        console.log(`QR code data length: ${savedTicket.qrCodeData ? savedTicket.qrCodeData.substring(0, 30) + '...' : 'N/A'}`);
+        
+        console.log(`QR code generated for ticket ${ticket._id}`);
+      } catch (qrError) {
+        console.error(`Failed to generate QR code for ticket ${ticket._id}:`, qrError);
+        // Continue with other tickets even if QR generation fails for one
+      }
+      
       tickets.push(ticket);
     }
 
@@ -267,7 +294,7 @@ const confirmPaymentAfterRecord = async (req, res, payment, paymentIntent) => {
     await event.save();
     console.log(`Updated event ticket count, new availability: ${event.ticketsAvailable}`);
 
-    console.log(`Payment confirmed successfully, created ${tickets.length} tickets`);
+    console.log(`Payment confirmed successfully, created ${tickets.length} tickets with QR codes`);
 
     return res.status(200).json({
       success: true,
@@ -375,21 +402,48 @@ const processPayment = asyncHandler(async (req, res) => {
       event.ticketsAvailable -= requestedQuantity;
       await event.save();
 
-      // Generate tickets
+      // Generate tickets with QR codes
+      console.log(`Creating ${requestedQuantity} tickets with QR codes`);
       const tickets = [];
+
       for (let i = 0; i < requestedQuantity; i++) {
         const ticketCode = generateTicketCode();
-        tickets.push({
+        
+        // Create the ticket first to get its ID
+        const ticket = await Ticket.create({
           user: req.user.id,
           event: eventId,
           payment: payment._id,
           ticketCode,
-          isUsed: false
+          isUsed: false,
+          status: 'active'
         });
+        
+        // Generate QR code for the ticket
+        try {
+          const qrCodeData = await generateTicketQR(
+            ticket._id.toString(),
+            ticket.ticketCode,
+            eventId
+          );
+          
+          // Update the ticket with the QR code data
+          ticket.qrCodeData = qrCodeData;
+          await ticket.save();
+          
+          // Verify QR code was saved
+          const savedTicket = await Ticket.findById(ticket._id);
+          console.log(`QR code saved successfully: ${savedTicket.qrCodeData ? 'Yes' : 'No'}`);
+          console.log(`QR code data length: ${savedTicket.qrCodeData ? savedTicket.qrCodeData.substring(0, 30) + '...' : 'N/A'}`);
+          
+          console.log(`QR code generated for ticket ${ticket._id}`);
+        } catch (qrError) {
+          console.error(`Failed to generate QR code for ticket ${ticket._id}:`, qrError);
+          // Continue with other tickets even if QR generation fails for one
+        }
+        
+        tickets.push(ticket);
       }
-
-      const createdTickets = await Ticket.insertMany(tickets);
-      console.log(`${createdTickets.length} tickets created`);
 
       res.status(200).json({
         success: true,
@@ -399,7 +453,7 @@ const processPayment = asyncHandler(async (req, res) => {
           amount: payment.amount,
           status: payment.status
         },
-        tickets: createdTickets.map(ticket => ({
+        tickets: tickets.map(ticket => ({
           id: ticket._id,
           code: ticket.ticketCode
         }))

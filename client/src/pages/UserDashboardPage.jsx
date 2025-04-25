@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import API from '../api';
 import { 
   Container, 
@@ -11,12 +11,16 @@ import {
   Alert
 } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
+import { useLocation } from 'react-router-dom';
 import { COLORS } from '../styles';
-import { SavedEvents, TicketsList, ReviewForm } from '../components/dashboard';
+import { SavedEvents, TicketsList, ReviewForm, RSVPsList } from '../components/dashboard';
 import dayjs from 'dayjs';
+import { getUserRSVPs } from '../api/rsvpService';
 
 const UserDashboardPage = () => {
   const { user, isAuthenticated } = useAuth();
+  const location = useLocation();
+  const ticketsRef = useRef(null);
   
   // Debug user authentication status
   console.log('Dashboard - User auth status:', { 
@@ -24,6 +28,16 @@ const UserDashboardPage = () => {
     hasUser: !!user, 
     userData: user 
   });
+  
+  // Scroll to tickets section if specified in location state
+  useEffect(() => {
+    if (location.state?.activeTab === 'tickets' && ticketsRef.current) {
+      // Scroll to tickets section with a small delay to ensure rendering
+      setTimeout(() => {
+        ticketsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 300);
+    }
+  }, [location.state, ticketsRef.current]);
   
   // Redirect if no user (shouldn't happen due to ProtectedRoute, but extra safety)
   if (!user) {
@@ -42,6 +56,7 @@ const UserDashboardPage = () => {
   const [tickets, setTickets] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [pastEvents, setPastEvents] = useState([]);
+  const [rsvps, setRSVPs] = useState([]);
   
   // Loading and error states
   const [loading, setLoading] = useState(true);
@@ -69,6 +84,7 @@ const UserDashboardPage = () => {
         let ticketsData = [];
         let reviewsData = [];
         let pastEventsData = [];
+        let rsvpsData = [];
         
         // Fetch data one by one with individual error handling
         try {
@@ -85,7 +101,7 @@ const UserDashboardPage = () => {
         }
         
         try {
-          const ticketsResponse = await API.get('/tickets');
+          const ticketsResponse = await API.get('/tickets/user');
           console.log('Tickets response:', ticketsResponse);
           if (ticketsResponse?.data) {
             ticketsData = Array.isArray(ticketsResponse.data) 
@@ -120,11 +136,24 @@ const UserDashboardPage = () => {
           console.error('Error fetching past events:', err.message);
         }
         
+        try {
+          const rsvpsResponse = await getUserRSVPs(user._id);
+          console.log('RSVPs response:', rsvpsResponse);
+          if (rsvpsResponse?.data) {
+            rsvpsData = Array.isArray(rsvpsResponse.data) 
+              ? rsvpsResponse.data 
+              : (rsvpsResponse.data.data || []);
+          }
+        } catch (err) {
+          console.error('Error fetching RSVPs:', err.message);
+        }
+        
         // Update state with available data (even if some endpoints failed)
         setSavedEvents(savedEventsData);
         setTickets(ticketsData);
         setReviews(reviewsData);
         setPastEvents(pastEventsData);
+        setRSVPs(rsvpsData);
         
         // Don't set an error, just handle empty data in the UI
         setLoading(false);
@@ -265,8 +294,8 @@ const UserDashboardPage = () => {
           </Paper>
         </Grid>
         
-        {/* My Tickets Section */}
-        <Grid item xs={12}>
+        {/* Tickets Section */}
+        <Grid item xs={12} ref={ticketsRef}>
           <Paper 
             elevation={0} 
             sx={{ 
@@ -289,13 +318,35 @@ const UserDashboardPage = () => {
               My Tickets
             </Typography>
             
-            {tickets.length > 0 ? (
-              <TicketsList tickets={tickets} />
-            ) : (
-              <Typography color="text.secondary">
-                You don't have any tickets yet. Purchase tickets for events to see them here.
-              </Typography>
-            )}
+            <TicketsList tickets={tickets} loading={loading} />
+          </Paper>
+        </Grid>
+        
+        {/* RSVPs Section */}
+        <Grid item xs={12}>
+          <Paper 
+            elevation={0} 
+            sx={{ 
+              p: 3, 
+              borderRadius: 2,
+              border: `1px solid ${COLORS.GRAY_LIGHT}`,
+              mb: 4
+            }}
+          >
+            <Typography 
+              variant="h5" 
+              component="h2" 
+              gutterBottom
+              sx={{ 
+                fontWeight: 600,
+                color: COLORS.SLATE,
+                mb: 3
+              }}
+            >
+              My RSVPs
+            </Typography>
+            
+            <RSVPsList rsvps={rsvps} loading={loading} error={error} />
           </Paper>
         </Grid>
         

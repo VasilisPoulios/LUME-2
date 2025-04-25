@@ -24,6 +24,7 @@ const CARD_ELEMENT_OPTIONS = {
       iconColor: '#fa755a',
     },
   },
+  hidePostalCode: true
 };
 
 const PaymentForm = ({ event, onSuccess }) => {
@@ -45,14 +46,13 @@ const PaymentForm = ({ event, onSuccess }) => {
       try {
         setLoading(true);
         const result = await createPaymentIntent(event.id);
-        if (result.success && result.clientSecret) {
-          setClientSecret(result.clientSecret);
+        if (result.success && result.data && result.data.clientSecret) {
+          setClientSecret(result.data.clientSecret);
         } else {
           setError('Could not initialize payment. Please try again.');
         }
       } catch (err) {
         setError(err.response?.data?.message || 'Failed to initialize payment');
-        console.error('Payment intent error:', err);
       } finally {
         setLoading(false);
       }
@@ -116,7 +116,6 @@ const PaymentForm = ({ event, onSuccess }) => {
         }
       }
     } catch (err) {
-      console.error('Payment error:', err);
       setError('An error occurred while processing your payment. Please try again.');
       setProcessing(false);
     }
@@ -133,7 +132,7 @@ const PaymentForm = ({ event, onSuccess }) => {
   return (
     <div className="payment-form-container">
       <h3>Payment Details</h3>
-      <p>Total: ${event?.price ? (event.price / 100).toFixed(2) : '0.00'}</p>
+      <p>Total: €{event?.price ? (event.price / 100).toFixed(2) : '0.00'}</p>
       
       {error && (
         <div className="payment-error">
@@ -156,7 +155,7 @@ const PaymentForm = ({ event, onSuccess }) => {
         >
           {processing ? 'Processing...' : 
            succeeded ? 'Payment Successful' : 
-           `Pay $${event?.price ? (event.price / 100).toFixed(2) : '0.00'}`}
+           `Pay €${event?.price ? (event.price / 100).toFixed(2) : '0.00'}`}
         </button>
       </form>
       

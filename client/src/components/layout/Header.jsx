@@ -16,7 +16,7 @@ import {
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import { useTheme } from '@mui/material/styles';
-import { LumeButton } from '../ui';
+import { LumeButton, DashboardLink } from '../ui';
 import { useAuth } from '../../context/AuthContext';
 import {
   LogoText,
@@ -33,12 +33,21 @@ import {
   signUpButtonSx
 } from '../../styles';
 
-// Navigation links
-const navLinks = [
-  { name: 'Discover', path: '/discover' },
-  { name: 'About', path: '/about' },
-  { name: 'Contact', path: '/contact' },
+// Common navigation links for all users
+const commonNavLinks = [
+  { id: 'discover', name: 'Discover', path: '/discover' },
+  { id: 'categories', name: 'Categories', path: '/categories' },
+  { id: 'about', name: 'About', path: '/about' },
+  { id: 'contact', name: 'Contact', path: '/contact' },
 ];
+
+// Role-specific navigation links
+const organizerNavLinks = [
+  { id: 'create-event', name: 'Create Event', path: '/organizer/events/create' },
+];
+
+// Admin doesn't need additional navigation links, they'll use the common ones
+const adminNavLinks = [];
 
 // Hide AppBar on scroll down
 function HideOnScroll(props) {
@@ -52,13 +61,26 @@ function HideOnScroll(props) {
   );
 }
 
+// Utility function to get appropriate navigation links based on user role
+const getNavLinksForRole = (isAdmin, isOrganizer) => {
+  if (isAdmin) {
+    return [...commonNavLinks, ...adminNavLinks];
+  } else if (isOrganizer) {
+    return [...commonNavLinks, ...organizerNavLinks];
+  }
+  return commonNavLinks;
+};
+
 const Header = () => {
   const [anchorElNav, setAnchorElNav] = useState(null);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const location = useLocation();
-  const { isAuthenticated, user, logout } = useAuth();
+  const { isAuthenticated, user, logout, isAdmin, isOrganizer } = useAuth();
   const [transparent, setTransparent] = useState(true);
+
+  // Pass the navigation links as props to prevent recreation in HeaderContent
+  const navLinks = getNavLinksForRole(isAdmin, isOrganizer);
 
   // Toggle header transparency based on scroll position
   useEffect(() => {
@@ -122,6 +144,7 @@ const Header = () => {
               handleCloseNavMenu={handleCloseNavMenu}
               handleLogout={handleLogout}
               transparent={transparentStyle}
+              navLinks={navLinks}
             />
           </AppBar>
         </HideOnScroll>
@@ -141,6 +164,7 @@ const Header = () => {
             handleCloseNavMenu={handleCloseNavMenu}
             handleLogout={handleLogout}
             transparent={transparentStyle}
+            navLinks={navLinks}
           />
         </AppBar>
       )}
@@ -159,8 +183,11 @@ const HeaderContent = ({
   handleOpenNavMenu, 
   handleCloseNavMenu, 
   handleLogout,
-  transparent
+  transparent,
+  navLinks
 }) => {
+  const { isAdmin, isOrganizer } = useAuth();
+  
   return (
     <Container maxWidth="lg">
       <Toolbar disableGutters sx={toolbarSx}>
@@ -212,7 +239,7 @@ const HeaderContent = ({
           {/* Navigation links in mobile menu */}
           {navLinks.map((link) => (
             <MenuItem 
-              key={link.name} 
+              key={`mobile-${link.id}`}
               onClick={handleCloseNavMenu}
               component={RouterLink}
               to={link.path}
@@ -229,11 +256,11 @@ const HeaderContent = ({
             <>
               <MenuItem 
                 onClick={handleCloseNavMenu}
-                component={RouterLink}
-                to="/dashboard"
                 sx={{ py: 1 }}
               >
-                <Typography textAlign="center" fontWeight={500}>Dashboard</Typography>
+                <DashboardLink>
+                  <Typography textAlign="center" fontWeight={500}>Dashboard</Typography>
+                </DashboardLink>
               </MenuItem>
               <MenuItem onClick={handleLogout} sx={{ py: 1 }}>
                 <Typography textAlign="center" fontWeight={500}>Logout</Typography>
@@ -268,7 +295,7 @@ const HeaderContent = ({
             <Box sx={navLinksBoxSx}>
               {navLinks.map((link) => (
                 <NavButton
-                  key={link.name}
+                  key={`desktop-${link.id}`}
                   component={RouterLink}
                   to={link.path}
                   sx={{ color: textColor }}
@@ -282,13 +309,12 @@ const HeaderContent = ({
             <Box sx={navBoxSx}>
               {isAuthenticated ? (
                 <>
-                  <NavButton
-                    component={RouterLink}
-                    to="/dashboard"
+                  <DashboardLink
+                    component="Button"
                     sx={{...dashboardLinkSx, color: textColor}}
                   >
                     Dashboard
-                  </NavButton>
+                  </DashboardLink>
                   <LumeButton
                     variant="outlined"
                     onClick={handleLogout}

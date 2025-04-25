@@ -5,8 +5,8 @@ import { COLORS, SHADOWS, TYPOGRAPHY, TRANSITIONS } from './ThemeConstants';
 // Logo text with custom styling
 export const LogoText = styled(Typography)(({ theme }) => ({
   fontFamily: TYPOGRAPHY.HEADING_FONT,
-  fontWeight: 800,
-  letterSpacing: 1.5,
+  fontWeight: 700,
+  letterSpacing: '.2rem',
   color: COLORS.ORANGE_MAIN,
   textShadow: '0 0 10px rgba(0, 0, 0, 0.3)',
   textDecoration: 'none',

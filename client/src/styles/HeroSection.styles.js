@@ -37,9 +37,9 @@ export const HeroContainer = styled(Box)(({ theme }) => ({
 // Main heading for LUME
 export const MainHeading = styled(Typography)(({ theme }) => ({
   fontFamily: TYPOGRAPHY.HEADING_FONT,
-  fontWeight: 800, // Increased weight for better visual prominence
+  fontWeight: 700, // Updated to match LogoText
   fontSize: '6rem', // Larger size for more impact
-  letterSpacing: '0.2rem', // Increased spacing for better readability
+  letterSpacing: '.2rem', // Updated to match LogoText
   color: '#fff', // White color for contrast against dark background
   textShadow: `0 0 30px ${alpha(COLORS.ORANGE_MAIN, 0.7)}`, // Orange glow for brand emphasis
   marginBottom: theme.spacing(2),

@@ -15,10 +15,19 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const contactRoutes = require('./routes/contactRoutes');
+const rsvpRoutes = require('./routes/rsvpRoutes');
 
 // Debug: Log environment variables
 console.log('Environment:', process.env.NODE_ENV);
 console.log('Stripe Key exists:', !!process.env.STRIPE_SECRET_KEY);
+console.log('Email settings loaded:', {
+  NODE_ENV: process.env.NODE_ENV,
+  EMAIL_HOST: process.env.EMAIL_HOST,
+  EMAIL_PORT: process.env.EMAIL_PORT,
+  EMAIL_USER: process.env.EMAIL_USER,
+  EMAIL_PASSWORD: process.env.EMAIL_PASSWORD ? '[PROVIDED]' : '[NOT PROVIDED]'
+});
 
 // Create Express app
 const app = express();
@@ -42,6 +51,8 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/contact', contactRoutes);
+app.use('/api/rsvps', rsvpRoutes);
 
 // Debug route to list all registered routes
 app.get('/api/debug/routes', (req, res) => {

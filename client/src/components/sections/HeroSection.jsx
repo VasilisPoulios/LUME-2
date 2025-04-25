@@ -53,7 +53,7 @@ const HeroSection = () => {
   ];
 
   return (
-    <HeroContainer>
+    <HeroContainer sx={{ pt: 8 }}>
       <Container 
         maxWidth="lg" 
         sx={heroContainerSx}

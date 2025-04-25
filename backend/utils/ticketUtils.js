@@ -2,31 +2,51 @@
  * Utility functions for ticket management
  */
 
+const crypto = require('crypto');
+const qrcode = require('qrcode');
+
 /**
  * Generates a random ticket code consisting of uppercase letters and numbers
  * Format: XXXX-XXXX-XXXX (where X is a letter or number)
  * @returns {string} The generated ticket code
  */
 const generateTicketCode = () => {
-  const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Excluding similar-looking characters like I, O, 1, 0
-  let code = '';
+  return crypto.randomBytes(5).toString('hex').toUpperCase();
+};
+
+/**
+ * Generate a QR code for a ticket
+ * @param {string} ticketId - The ticket ID
+ * @param {string} ticketCode - The ticket code
+ * @param {string} eventId - The event ID
+ * @returns {Promise<string>} A base64 encoded QR code image
+ */
+const generateTicketQR = async (ticketId, ticketCode, eventId) => {
+  // Use only the ticket code for the QR code - much simpler to scan and validate
+  const qrData = ticketCode;
   
-  // Generate 3 groups of 4 characters
-  for (let group = 0; group < 3; group++) {
-    for (let i = 0; i < 4; i++) {
-      const randomIndex = Math.floor(Math.random() * characters.length);
-      code += characters[randomIndex];
-    }
-    
-    // Add hyphen between groups, but not after the last group
-    if (group < 2) {
-      code += '-';
-    }
+  console.log(`Generating QR code for ticket: ${ticketId} with code: ${ticketCode}`);
+
+  // Generate QR code as base64 string
+  try {
+    const qrCodeDataUrl = await qrcode.toDataURL(qrData, {
+      errorCorrectionLevel: 'H',
+      margin: 1,
+      width: 300,
+      color: {
+        dark: '#000000',
+        light: '#ffffff'
+      }
+    });
+
+    return qrCodeDataUrl;
+  } catch (error) {
+    console.error('Error generating QR code:', error);
+    throw error;
   }
-  
-  return code;
 };
 
 module.exports = {
-  generateTicketCode
+  generateTicketCode,
+  generateTicketQR
 }; 

@@ -3,8 +3,11 @@ import { Outlet } from 'react-router-dom';
 import { Box } from '@mui/material';
 import Navbar from './Navbar';
 import Footer from './Footer';
+import Header from './Header';
+import Layout from './Layout';
+import LandingHeader from './LandingHeader';
 
-const Layout = () => {
+const LayoutComponent = () => {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <Navbar />
@@ -16,4 +19,12 @@ const Layout = () => {
   );
 };
 
-export default Layout; 
+export default LayoutComponent;
+
+// Export all layout components
+export {
+  Header,
+  Footer,
+  Layout,
+  LandingHeader
+}; 

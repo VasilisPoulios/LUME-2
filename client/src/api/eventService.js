@@ -134,11 +134,20 @@ export const getEventAttendees = async (eventId) => {
 // RSVP for a free event
 export const createRSVP = async (eventId, rsvpData) => {
   try {
+    console.log(`Creating RSVP for event ID: ${eventId}`, rsvpData);
+    
+    if (!eventId) {
+      throw new Error("Event ID is required to create an RSVP");
+    }
+    
     const response = await api.post(`/events/${eventId}/rsvp`, rsvpData);
-    return response.data;
+    return { success: true, data: response.data };
   } catch (error) {
-    console.error('RSVP Error:', error);
-    throw error;
+    console.error("RSVP creation error:", error);
+    return { 
+      success: false, 
+      message: error.response?.data?.message || error.message || "Failed to create RSVP" 
+    };
   }
 };
 

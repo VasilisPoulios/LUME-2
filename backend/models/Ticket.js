@@ -13,6 +13,11 @@ const TicketSchema = new mongoose.Schema(
       ref: 'Event',
       required: true
     },
+    payment: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Payment',
+      required: true
+    },
     ticketCode: {
       type: String,
       unique: true,
@@ -21,10 +26,18 @@ const TicketSchema = new mongoose.Schema(
         return crypto.randomBytes(10).toString('hex').toUpperCase();
       }
     },
+    qrCodeData: {
+      type: String,
+      default: null
+    },
     status: {
       type: String,
       enum: ['active', 'used', 'cancelled'],
       default: 'active'
+    },
+    isUsed: {
+      type: Boolean,
+      default: false
     },
     createdAt: {
       type: Date,

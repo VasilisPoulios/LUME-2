@@ -109,44 +109,68 @@ const EventCard = ({ event, onRemove }) => {
   const formatEventDate = () => {
     if (!displayData) return 'Date not available';
     
-    // Check different possible date fields
-    const startDate = displayData.startDateTime || displayData.date || displayData.eventDate;
+    // Try different possible date fields in order of priority
+    const dateField = displayData.startDateTime || displayData.date || displayData.eventDate || displayData.createdAt;
     
-    if (!startDate) return 'Date not available';
+    if (!dateField) {
+      console.warn('No date field found for event:', displayData.title || displayData.eventId);
+      return 'Date not available';
+    }
     
     try {
-      return dayjs(startDate).format('MMM D, YYYY');
+      const parsedDate = dayjs(dateField);
+      
+      // Validate that the parsed date is valid
+      if (parsedDate.isValid()) {
+        return parsedDate.format('MMM D, YYYY');
+      } else {
+        // Try with specific format if standard parse fails
+        const withFormat = dayjs(dateField, 'YYYY-MM-DD', true);
+        if (withFormat.isValid()) {
+          return withFormat.format('MMM D, YYYY');
+        }
+        
+        console.warn('Invalid date format:', dateField);
+        return 'Date not available';
+      }
     } catch (err) {
-      console.error('Error formatting date:', err);
-      return 'Date format error';
+      console.error('Error formatting date:', err, 'Date value:', dateField);
+      return 'Date not available';
     }
   };
 
   // Format time properly
   const formatEventTime = () => {
-    // Check different possible time fields
-    if (!displayData) return null;
+    if (!displayData) return 'Time not available';
     
-    // For time strings
-    if (typeof displayData.time === 'string' && displayData.time.trim() !== '') {
-      return displayData.time;
+    // Try different possible date/time fields
+    const timeField = displayData.startDateTime || displayData.date || displayData.eventDate;
+    
+    if (!timeField) {
+      console.warn('No time field found for event:', displayData.title || displayData.eventId);
+      return 'Time not available';
     }
     
-    // For datetime objects
     try {
-      if (displayData.startDateTime) {
-        const start = dayjs(displayData.startDateTime).format('h:mm A');
-        if (displayData.endDateTime) {
-          const end = dayjs(displayData.endDateTime).format('h:mm A');
-          return `${start} - ${end}`;
+      const parsedDate = dayjs(timeField);
+      
+      // Validate that the parsed date is valid
+      if (parsedDate.isValid()) {
+        return parsedDate.format('h:mm A');
+      } else {
+        // Try with specific format if standard parse fails
+        const withFormat = dayjs(timeField, 'YYYY-MM-DD HH:mm:ss', true);
+        if (withFormat.isValid()) {
+          return withFormat.format('h:mm A');
         }
-        return start;
+        
+        console.warn('Invalid time format:', timeField);
+        return 'Time not available';
       }
     } catch (err) {
-      console.error('Error formatting time:', err);
+      console.error('Error formatting time:', err, 'Time value:', timeField);
+      return 'Time not available';
     }
-    
-    return null;
   };
 
   // Format price properly based on Event model structure
@@ -171,19 +195,22 @@ const EventCard = ({ event, onRemove }) => {
     // Handle string prices that might come from API
     if (typeof price === 'string') {
       if (price.toLowerCase().includes('free')) return 'Free';
-      if (price.startsWith('$')) return price;
+      if (price.startsWith('€')) return price;
+      if (price.startsWith('$')) return price.replace('$', '€');
       
       // Try to parse numeric string
       const numPrice = parseFloat(price);
       if (!isNaN(numPrice)) {
-        return `$${numPrice.toFixed(2)}`;
+        // Convert cents to euros
+        return `€${(numPrice / 100).toFixed(2)}`;
       }
       return price;
     }
     
     // Handle number type as per model definition
     if (typeof price === 'number') {
-      return `$${price.toFixed(2)}`;
+      // Convert cents to euros
+      return `€${(price / 100).toFixed(2)}`;
     }
     
     return 'Free';

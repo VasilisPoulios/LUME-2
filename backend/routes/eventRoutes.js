@@ -13,7 +13,7 @@ const {
 } = require('../controllers/eventController');
 
 // Add RSVP controller import
-const { createRSVP } = require('../controllers/rsvpController');
+const { createRSVP, getRSVPsByEvent } = require('../controllers/rsvpController');
 
 const router = express.Router();
 
@@ -64,7 +64,8 @@ router
     deleteEvent
   );
 
-// RSVP route
+// RSVP routes
 router.post('/:id/rsvp', createRSVP);
+router.get('/:id/rsvps', protect, authorize('organizer', 'admin'), getRSVPsByEvent);
 
 module.exports = router; 

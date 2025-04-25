@@ -89,13 +89,22 @@ const UsersTab = () => {
       });
       
       if (response.success) {
-        setUsers(response.data.data.map(user => ({
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          joinedDate: new Date(user.createdAt)
-        })));
+        // Process and validate data before setting state
+        const processedUsers = response.data.data.map(user => {
+          // Make sure createdAt exists and convert to Date
+          const createdAt = user.createdAt ? new Date(user.createdAt) : null;
+          
+          return {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            joinedDate: createdAt
+          };
+        });
+        
+        // Set the processed users to state
+        setUsers(processedUsers);
         setRowCount(response.data.count);
       } else {
         setError(response.message || 'Failed to fetch users');
@@ -209,24 +218,35 @@ const UsersTab = () => {
       field: 'joinedDate',
       headerName: 'Joined Date',
       width: 180,
-      valueFormatter: (params) => {
-        if (!params.value) return '';
+      renderCell: (params) => {
         try {
-          // Format as MMM d, yyyy
-          const date = new Date(params.value);
-          if (isNaN(date.getTime())) {
-            return 'Invalid date';
+          // Safely access the joinedDate value
+          const dateValue = params.row?.joinedDate;
+          
+          // If no date value, return N/A
+          if (!dateValue) {
+            return <Typography variant="body2">N/A</Typography>;
           }
           
-          // Create a formatter that shows both the date and the relative time
-          return `${date.toLocaleDateString('en-US', {
+          // Convert to proper Date object if needed
+          const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+          
+          // Check if date is valid
+          if (isNaN(date.getTime())) {
+            return <Typography variant="body2">Invalid date</Typography>;
+          }
+          
+          // Format the date
+          const formattedDate = `${date.toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'short',
             day: 'numeric'
           })} (${formatDistanceToNow(date, { addSuffix: true })})`;
+          
+          return <Typography variant="body2">{formattedDate}</Typography>;
         } catch (err) {
-          console.error('Error formatting date:', err);
-          return 'Error';
+          console.error('Error rendering date:', err);
+          return <Typography variant="body2" color="error">Error</Typography>;
         }
       }
     },
@@ -319,7 +339,7 @@ const UsersTab = () => {
         </Alert>
       )}
 
-      <div style={{ height: 500, width: '100%' }}>
+      <div style={{ height: 500, width: '100%', display: 'flex', flexDirection: 'column' }}>
         <DataGrid
           rows={users}
           columns={columns}
@@ -338,6 +358,7 @@ const UsersTab = () => {
             noRowsOverlay: CustomNoRowsOverlay,
           }}
           sx={{
+            flexGrow: 1,
             '& .MuiDataGrid-cell:focus': {
               outline: 'none',
             },
@@ -407,4 +428,4 @@ const UsersTab = () => {
   );
 };
 
-export default UsersTab; 
+export default UsersTab;

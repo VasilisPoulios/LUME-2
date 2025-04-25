@@ -22,7 +22,8 @@ import {
   ArrowBack as ArrowBackIcon,
   CreditCard as CreditCardIcon,
   Event as EventIcon,
-  CheckCircleOutline as CheckCircleIcon
+  CheckCircleOutline as CheckCircleIcon,
+  Dashboard as DashboardIcon
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { getEvent } from '../api/eventService';
@@ -38,29 +39,24 @@ import { COLORS } from '../styles';
 import { formatImageUrl, formatPrice, formatCurrency } from '../utils/helpers';
 
 // Load Stripe outside of component to avoid recreating Stripe on each render
-// Remove any static keys and only use the environment variable
 const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
-console.log('Using Stripe key (first chars):', stripeKey ? `${stripeKey.substring(0, 8)}...` : 'NOT FOUND');
-console.log('Stripe key starts with "pk_":', stripeKey?.startsWith('pk_'));
+console.log('Stripe Publishable Key:', stripeKey?.substring(0, 8) + '...');
+console.log('Stripe.js version:', '@stripe/react-stripe-js', '@stripe/stripe-js');
 
-let stripePromise = null;
-try {
-  if (!stripeKey) {
-    console.error('ERROR: Stripe publishable key is missing! Check your environment variables.');
-  } else {
-    // Disable wallet components to avoid the 401 error
-    stripePromise = loadStripe(stripeKey, {
-      betas: ['wallet_config_beta_1'],
-      wallets: {
-        applePay: 'never',
-        googlePay: 'never'
-      }
-    });
-    console.log('Stripe loading attempted successfully');
-  }
-} catch (err) {
-  console.error('Error initializing Stripe:', err);
+// Check if the key looks valid
+if (!stripeKey || !stripeKey.startsWith('pk_')) {
+  console.error('Invalid Stripe publishable key format. Should start with pk_');
 }
+
+const stripePromise = loadStripe(stripeKey);
+console.log('Stripe instance initialized');
+
+// Use this to log when the promise resolves
+stripePromise.then(stripe => {
+  console.log('Stripe initialized successfully:', !!stripe);
+}).catch(err => {
+  console.error('Stripe initialization error:', err);
+});
 
 // Card element options
 const cardElementOptions = {
@@ -76,82 +72,26 @@ const cardElementOptions = {
       color: '#9e2146',
     },
   },
-  hidePostalCode: true,
-  // Disable wallet buttons
-  wallets: {
-    applePay: 'never',
-    googlePay: 'never'
-  }
+  hidePostalCode: true
 };
 
 // Steps for checkout process
 const steps = ['Event Details', 'Payment Information', 'Confirmation'];
 
 // Checkout form component
-const CheckoutForm = ({ eventId, event, quantity = 1, onSuccess }) => {
+const CheckoutForm = ({ eventId, event, quantity = 1, onSuccess, clientSecret }) => {
   const stripe = useStripe();
   const elements = useElements();
   const { user } = useAuth();
   const [error, setError] = useState(null);
   const [processing, setProcessing] = useState(false);
-  const [clientSecret, setClientSecret] = useState('');
-  const [paymentIntent, setPaymentIntent] = useState(null);
   
-  useEffect(() => {
-    // Create payment intent when component mounts
-    const getPaymentIntent = async () => {
-      try {
-        setProcessing(true);
-        setError(null);
-        
-        // Calculate the amount in cents for logging purposes
-        const amountInCents = Math.round((event?.price || 0) * quantity * 100);
-        console.log(`Creating payment intent for event ${eventId} with quantity ${quantity}, amount: ${amountInCents} cents`);
-        
-        const response = await createPaymentIntent(eventId, quantity);
-        console.log('Full payment intent response:', response);
-        
-        if (response.success && response.data) {
-          console.log('Payment intent created:', response.data);
-          
-          if (response.data.clientSecret) {
-            setClientSecret(response.data.clientSecret);
-            console.log('Client secret saved successfully');
-            
-            setPaymentIntent({
-              id: response.data.paymentIntentId,
-              amount: response.data.amount,
-              currency: response.data.currency || 'eur'
-            });
-          } else {
-            console.error('Missing client secret in response');
-            setError('Payment initialization failed: Missing client secret');
-          }
-        } else {
-          console.error('Failed to create payment intent:', response);
-          setError(response.message || 'Failed to create payment intent');
-        }
-      } catch (err) {
-        console.error('Payment intent error:', err);
-        setError('An error occurred while setting up payment: ' + (err.message || 'Unknown error'));
-      } finally {
-        setProcessing(false);
-      }
-    };
-
-    if (eventId && event && quantity > 0) {
-      getPaymentIntent();
-    } else {
-      setError('Invalid event or quantity data');
-    }
-  }, [eventId, event, quantity]);
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!stripe || !elements) {
       // Stripe.js has not loaded yet
-      console.error('Stripe or elements not loaded');
+      setError('Please wait while we connect to our payment provider...');
       return;
     }
 
@@ -159,44 +99,38 @@ const CheckoutForm = ({ eventId, event, quantity = 1, onSuccess }) => {
     setError(null);
 
     try {
-      console.log('Preparing payment submission with client secret:', clientSecret ? clientSecret.substring(0, 10) + '...' : 'missing');
-      
-      if (!clientSecret) {
-        throw new Error('No client secret available. Please try again.');
-      }
-      
-      // First get the card element
+      // Get card element
       const cardElement = elements.getElement(CardElement);
       if (!cardElement) {
         throw new Error('Card element not found');
       }
       
-      console.log('Creating payment method from card element');
+      console.log('Processing payment...');
       
-      // Use the client-side confirmation method
-      const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+      // Confirm the payment
+      const result = await stripe.confirmCardPayment(clientSecret, {
         payment_method: {
           card: cardElement,
           billing_details: {
-            name: user?.name || 'Unknown User',
+            name: user?.name || 'Unknown',
             email: user?.email || 'unknown@example.com',
           },
         },
       });
-
-      if (error) {
-        console.error('Payment confirmation error:', error);
-        setError(error.message || 'Failed to process your card');
+      
+      // Handle payment errors
+      if (result.error) {
+        console.error('Payment confirmation error:', result.error);
+        setError(result.error.message || 'Failed to process your payment');
         return;
       }
       
-      console.log('Payment confirmed with Stripe:', paymentIntent ? paymentIntent.id : 'missing paymentIntent');
-      
-      if (paymentIntent && paymentIntent.status === 'succeeded') {
-        // Payment successful, now confirm in our backend
-        const confirmation = await confirmPayment(paymentIntent.id, eventId);
+      // Handle successful payment
+      if (result.paymentIntent && result.paymentIntent.status === 'succeeded') {
+        console.log('Payment successful! Payment intent ID:', result.paymentIntent.id);
         
-        console.log('Backend confirmation result:', confirmation);
+        // Notify our backend to create tickets
+        const confirmation = await confirmPayment(result.paymentIntent.id, eventId);
         
         if (confirmation.success && confirmation.data) {
           onSuccess(confirmation.data);
@@ -204,10 +138,11 @@ const CheckoutForm = ({ eventId, event, quantity = 1, onSuccess }) => {
           setError(confirmation.message || 'Payment was processed but ticket creation failed');
         }
       } else {
-        setError(`Payment returned with status: ${paymentIntent?.status || 'unknown'}`);
+        console.warn('Payment not succeeded:', result.paymentIntent?.status);
+        setError(`Payment failed with status: ${result.paymentIntent?.status || 'unknown'}`);
       }
     } catch (err) {
-      console.error('Payment submission error:', err);
+      console.error('Payment processing error:', err);
       setError('An error occurred during payment processing. Please try again.');
     } finally {
       setProcessing(false);
@@ -248,39 +183,29 @@ const CheckoutForm = ({ eventId, event, quantity = 1, onSuccess }) => {
             <Typography variant="body2">Event:</Typography>
           </Grid>
           <Grid item xs={6}>
-            <Typography variant="body2" align="right">
-              {event.title}
-            </Typography>
+            <Typography variant="body2" align="right">{event?.title}</Typography>
           </Grid>
           
           <Grid item xs={6}>
             <Typography variant="body2">Quantity:</Typography>
           </Grid>
           <Grid item xs={6}>
-            <Typography variant="body2" align="right">
-              {quantity}
-            </Typography>
+            <Typography variant="body2" align="right">{quantity} ticket{quantity !== 1 ? 's' : ''}</Typography>
           </Grid>
           
           <Grid item xs={6}>
             <Typography variant="body2">Price per ticket:</Typography>
           </Grid>
           <Grid item xs={6}>
-            <Typography variant="body2" align="right">
-              €{formatPrice(event.price)}
-            </Typography>
-          </Grid>
-          
-          <Grid item xs={12}>
-            <Divider sx={{ my: 1 }} />
+            <Typography variant="body2" align="right">{formatCurrency(event?.price || 0)}</Typography>
           </Grid>
           
           <Grid item xs={6}>
-            <Typography variant="subtitle2">Total:</Typography>
+            <Typography variant="body2" fontWeight="bold">Total:</Typography>
           </Grid>
           <Grid item xs={6}>
-            <Typography variant="subtitle2" align="right">
-              €{formatPrice(event.price * quantity)}
+            <Typography variant="body2" fontWeight="bold" align="right">
+              {formatCurrency((event?.price || 0) * quantity)}
             </Typography>
           </Grid>
         </Grid>
@@ -289,12 +214,21 @@ const CheckoutForm = ({ eventId, event, quantity = 1, onSuccess }) => {
       <Button
         type="submit"
         variant="contained"
-        color="primary"
         fullWidth
-        disabled={processing || !stripe}
-        startIcon={processing ? <CircularProgress size={20} /> : <CreditCardIcon />}
+        disabled={!stripe || processing || !elements}
+        sx={{ 
+          py: 1.5,
+          bgcolor: COLORS.ORANGE_MAIN,
+          '&:hover': {
+            bgcolor: COLORS.ORANGE_DARK,
+          }
+        }}
       >
-        {processing ? 'Processing...' : 'Pay Now'}
+        {processing ? (
+          <CircularProgress size={24} color="inherit" />
+        ) : (
+          `Pay ${formatCurrency((event?.price || 0) * quantity)}`
+        )}
       </Button>
     </form>
   );
@@ -312,6 +246,8 @@ const CheckoutPage = () => {
   const [step, setStep] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [successData, setSuccessData] = useState(null);
+  const [clientSecret, setClientSecret] = useState('');
+  const [paymentLoading, setPaymentLoading] = useState(false);
   
   // Get quantity from location state if available
   useEffect(() => {
@@ -370,6 +306,52 @@ const CheckoutPage = () => {
     }
   }, [isAuthenticated, navigate, eventId, quantity]);
   
+  // Create a payment intent before showing the payment form
+  const createIntent = async () => {
+    try {
+      setPaymentLoading(true);
+      console.log('Creating payment intent for event:', eventId, 'quantity:', quantity);
+      
+      const response = await createPaymentIntent(eventId, quantity);
+      console.log('Payment intent creation response:', response);
+      
+      if (response.success && response.data?.clientSecret) {
+        const secret = response.data.clientSecret;
+        
+        // Validate the client secret format
+        if (!secret || secret.length < 20 || !secret.includes('_secret_')) {
+          console.error('Invalid client secret format:', 
+            secret ? (secret.length > 10 ? `${secret.substring(0, 10)}...` : 'too short') : 'missing');
+          setError('Payment setup failed: Invalid client secret format');
+          return false;
+        }
+        
+        setClientSecret(secret);
+        console.log('Payment intent created successfully, client secret obtained');
+        console.log('Client secret length:', secret.length);
+        return true;
+      } else {
+        console.error('Failed to get client secret from response:', response);
+        setError(response.message || 'Failed to initialize payment. Please try again.');
+        return false;
+      }
+    } catch (err) {
+      console.error('Error creating payment intent:', err);
+      setError('Failed to initialize payment. Please try again.');
+      return false;
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+  
+  // Handle continue to payment
+  const handleContinue = async () => {
+    const success = await createIntent();
+    if (success) {
+      setStep(1);
+    }
+  };
+  
   // Handle successful payment
   const handlePaymentSuccess = (data) => {
     console.log('Payment successful, data received:', data);
@@ -384,11 +366,6 @@ const CheckoutPage = () => {
     } else {
       navigate(`/events/${eventId}`);
     }
-  };
-  
-  // Handle continue to payment
-  const handleContinue = () => {
-    setStep(1);
   };
   
   // Handle view ticket after successful payment
@@ -415,6 +392,12 @@ const CheckoutPage = () => {
       // Fallback to tickets list
       navigate('/tickets');
     }
+  };
+  
+  // Handle navigation to user dashboard
+  const handleViewAllTickets = () => {
+    // Navigate to user dashboard with the tickets tab focused
+    navigate('/dashboard', { state: { activeTab: 'tickets' } });
   };
   
   // Render loading state
@@ -580,8 +563,8 @@ const CheckoutPage = () => {
               color="primary"
               fullWidth
               onClick={handleContinue}
-              startIcon={<CreditCardIcon />}
-              disabled={!event?.ticketsAvailable || (event?.ticketsAvailable < quantity)}
+              startIcon={paymentLoading ? null : <CreditCardIcon />}
+              disabled={!event?.ticketsAvailable || (event?.ticketsAvailable < quantity) || paymentLoading}
               sx={{
                 bgcolor: COLORS.ORANGE_MAIN,
                 '&:hover': { bgcolor: COLORS.ORANGE_DARK },
@@ -590,7 +573,11 @@ const CheckoutPage = () => {
                 boxShadow: '0 4px 12px rgba(255, 129, 0, 0.15)',
               }}
             >
-              Continue to Payment
+              {paymentLoading ? (
+                <CircularProgress size={24} color="inherit" />
+              ) : (
+                'Continue to Payment'
+              )}
             </Button>
             
             {(!event?.ticketsAvailable || (event?.ticketsAvailable < quantity)) && (
@@ -603,31 +590,39 @@ const CheckoutPage = () => {
           </Box>
         )}
         
-        {step === 1 && (
-          <Elements 
-            stripe={stripePromise} 
-            options={{
-              mode: 'payment',
-              currency: 'eur',
-              paymentMethodCreation: 'manual',
-              amount: Math.round((event?.price || 0) * quantity * 100), // Convert to cents
-              appearance: {
-                theme: 'stripe',
-              },
-              // Disable wallet buttons 
-              wallets: {
-                applePay: 'never',
-                googlePay: 'never'
-              }
-            }}
-          >
-            <CheckoutForm 
-              eventId={eventId} 
-              event={event} 
-              quantity={quantity} 
-              onSuccess={handlePaymentSuccess} 
-            />
-          </Elements>
+        {step === 1 && clientSecret && (
+          <Box>
+            <Typography variant="h6" gutterBottom mb={3}>
+              Complete Your Payment
+            </Typography>
+            
+            <Elements 
+              stripe={stripePromise} 
+              options={{
+                clientSecret,
+                appearance: {
+                  theme: 'stripe',
+                  variables: {
+                    colorPrimary: COLORS.ORANGE_MAIN,
+                  }
+                },
+              }}
+            >
+              <CheckoutForm 
+                eventId={eventId} 
+                event={event} 
+                quantity={quantity} 
+                onSuccess={handlePaymentSuccess}
+                clientSecret={clientSecret}
+              />
+            </Elements>
+          </Box>
+        )}
+        
+        {step === 1 && !clientSecret && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+            <CircularProgress />
+          </Box>
         )}
         
         {step === 2 && successData && (
@@ -728,7 +723,7 @@ const CheckoutPage = () => {
               </Box>
             )}
             
-            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>
               <Button 
                 variant="outlined"
                 onClick={() => navigate(`/events/${eventId}`)}
@@ -747,6 +742,14 @@ const CheckoutPage = () => {
                 }}
               >
                 {successData.tickets?.length > 1 ? 'View All Tickets' : 'View Ticket'}
+              </Button>
+              <Button 
+                variant="outlined"
+                color="secondary"
+                onClick={handleViewAllTickets}
+                startIcon={<DashboardIcon />}
+              >
+                My Dashboard
               </Button>
             </Box>
           </Box>
